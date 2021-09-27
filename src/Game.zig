@@ -6,6 +6,17 @@ const Timer = @import("Timer.zig");
 const Board = @import("Board.zig");
 const Piece = @import("Piece.zig");
 const constant = @import("constant.zig");
+const DrawInterface = @import("interface.zig").DrawInterface;
+
+const Entity = enum {
+    Board,
+    Piece,
+};
+
+const Element = struct {
+    typ: Entity,
+    obj: *const c_void,
+};
 
 const Self = @This();
 
@@ -16,6 +27,7 @@ cap_timer: Timer = undefined,
 left_viewport: c.SDL_Rect = undefined,
 right_viewport: c.SDL_Rect = undefined,
 play_viewport: c.SDL_Rect = undefined,
+entities: [2]Element = undefined,
 
 pub fn init() !Self {
     if (c.SDL_Init(c.SDL_INIT_VIDEO) < 0) {
@@ -26,9 +38,24 @@ pub fn init() !Self {
     var self = Self{
         .fps_timer = Timer.init(),
         .cap_timer = Timer.init(),
-        .left_viewport = .{ .x = 0, .y = 0, .w = 360, .h = constant.SCREEN_HEIGHT },
-        .right_viewport = .{ .x = 360, .y = 0, .w = 220, .h = constant.SCREEN_HEIGHT },
-        .play_viewport = .{ .x = constant.BLOCK, .y = constant.BLOCK, .w = 300, .h = constant.SCREEN_HEIGHT - constant.BLOCK * 2 },
+        .left_viewport = .{
+            .x = 0,
+            .y = 0,
+            .w = 360,
+            .h = constant.SCREEN_HEIGHT,
+        },
+        .right_viewport = .{
+            .x = 360,
+            .y = 0,
+            .w = 220,
+            .h = constant.SCREEN_HEIGHT,
+        },
+        .play_viewport = .{
+            .x = constant.BLOCK,
+            .y = constant.BLOCK,
+            .w = 300,
+            .h = constant.SCREEN_HEIGHT - constant.BLOCK * 2,
+        },
     };
 
     self.window = c.SDL_CreateWindow(
@@ -48,30 +75,43 @@ pub fn init() !Self {
         return error.ERROR_CREATE_RENDERER;
     };
 
+    self.entities[0] = .{
+        .typ = .Board,
+        .obj = &Board.init(self.renderer.?),
+    };
+
+    self.entities[1] = .{
+        .typ = .Piece,
+        .obj = &try Piece.randomPiece(self.renderer.?, @intToPtr(*Board, @ptrToInt(self.entities[0].obj))),
+    };
+
     return self;
 }
 
 pub fn loop(self: *Self) !void {
-    var board = Board.init(self.renderer.?);
-    var piece = try Piece.randomPiece(self.renderer.?, &board);
-
     self.cap_timer.startTimer();
+
+    var p = for (self.entities) |e| {
+        if (e.typ == .Piece) {
+            break @intToPtr(*Piece, @ptrToInt(e.obj));
+        }
+    } else unreachable;
 
     mainloop: while (true) {
         self.fps_timer.startTimer();
 
-        if (try self.handleInput(&piece)) {
+        if (try self.handleInput(p)) {
             break :mainloop;
         }
 
         const elapsed_time = self.cap_timer.getTicks();
         if (elapsed_time >= 1000) {
-            try piece.moveDown();
+            try p.moveDown();
             self.cap_timer.startTimer();
         }
 
         self.updateGame();
-        self.renderGame(board, piece);
+        self.renderGame();
 
         const time_taken = @intToFloat(f64, self.fps_timer.getTicks());
         if (time_taken < constant.TICKS_PER_FRAME) {
@@ -80,7 +120,7 @@ pub fn loop(self: *Self) !void {
     }
 }
 
-fn handleInput(self: Self, piece: *Piece) !bool {
+fn handleInput(self: Self, _piece: *Piece) !bool {
     _ = self;
     var e: c.SDL_Event = undefined;
 
@@ -90,10 +130,10 @@ fn handleInput(self: Self, piece: *Piece) !bool {
 
             c.SDL_KEYDOWN => switch (e.key.keysym.sym) {
                 c.SDLK_ESCAPE => break true,
-                c.SDLK_UP => piece.rotate(),
-                c.SDLK_DOWN => try piece.moveDown(),
-                c.SDLK_LEFT => piece.moveLeft(),
-                c.SDLK_RIGHT => piece.moveRight(),
+                c.SDLK_UP => _piece.rotate(),
+                c.SDLK_DOWN => try _piece.moveDown(),
+                c.SDLK_LEFT => _piece.moveLeft(),
+                c.SDLK_RIGHT => _piece.moveRight(),
                 else => {},
             },
             else => {},
@@ -105,7 +145,7 @@ fn updateGame(self: Self) void {
     _ = self;
 }
 
-fn renderGame(self: Self, board: Board, piece: Piece) void {
+fn renderGame(self: *Self) void {
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0x00, 0x00, 0x00, 0x00);
     _ = c.SDL_RenderClear(self.renderer.?);
 
@@ -124,15 +164,20 @@ fn renderGame(self: Self, board: Board, piece: Piece) void {
         .h = constant.SCREEN_HEIGHT - constant.BLOCK * 2,
     });
 
-    board.draw();
-    piece.draw();
+    for (self.entities) |e| {
+        var obj_interface = switch (e.typ) {
+            .Board => &(@intToPtr(*Board, @ptrToInt(e.obj))).interface,
+            .Piece => &(@intToPtr(*Piece, @ptrToInt(e.obj))).interface,
+        };
+
+        obj_interface.draw();
+    }
 
     // Right viewport
     _ = c.SDL_RenderSetViewport(self.renderer.?, &self.right_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0x00, 0x00, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = 220, .h = constant.SCREEN_HEIGHT });
 
-    // Render logic
     _ = c.SDL_RenderPresent(self.renderer.?);
 }
 

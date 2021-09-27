@@ -3,6 +3,8 @@ const c = @import("sdl.zig");
 const t = @import("Tetromino.zig");
 const mixin = @import("Mixin.zig");
 const constant = @import("constant.zig");
+const DrawInterface = @import("interface.zig").DrawInterface;
+
 const Board = @import("Board.zig");
 const Vacant = [3]u8{ 255, 255, 255 };
 
@@ -16,6 +18,7 @@ y: i32 = undefined,
 tetromino: t.Tetromino = undefined,
 tetromino_index: u32 = undefined,
 tetromino_layout: t.TetrominoLayout = undefined,
+interface: DrawInterface,
 
 usingnamespace mixin.DrawMixin(Self);
 
@@ -28,6 +31,7 @@ pub fn init(renderer: *c.SDL_Renderer, board: *Board, tetromino: t.Tetromino) Se
         .tetromino = tetromino,
         .renderer = renderer,
         .tetromino_layout = tetromino.layout[0],
+        .interface = DrawInterface.init(draw),
     };
 }
 
@@ -43,7 +47,9 @@ pub fn randomPiece(renderer: *c.SDL_Renderer, board: *Board) !Self {
     return Self.init(renderer, board, t.Tetrominoes[num]);
 }
 
-pub fn draw(self: Self) void {
+pub fn draw(inner: *DrawInterface) void {
+    const self = @fieldParentPtr(Self, "interface", inner);
+
     var row: u8 = 0;
     while (row < self.tetromino_layout.len) : (row += 1) {
         var col: u8 = 0;
@@ -68,14 +74,14 @@ pub fn moveDown(self: *Self) !void {
 pub fn moveRight(self: *Self) void {
     if (!self.collision(1, 0, self.tetromino_layout)) {
         self.x += 1;
-        self.draw();
+        self.interface.draw();
     }
 }
 
 pub fn moveLeft(self: *Self) void {
     if (!self.collision(-1, 0, self.tetromino_layout)) {
         self.x -= 1;
-        self.draw();
+        self.interface.draw();
     }
 }
 
@@ -97,7 +103,7 @@ pub fn rotate(self: *Self) void {
         self.x += kick;
         self.tetromino_index = @intCast(u32, (self.tetromino_index + 1) % self.tetromino.layout.len); // (0+1)%4 => 1
         self.tetromino_layout = self.tetromino.layout[self.tetromino_index];
-        self.draw();
+        self.interface.draw();
     }
 }
 
