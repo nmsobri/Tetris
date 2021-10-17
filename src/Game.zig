@@ -8,34 +8,28 @@ const Piece = @import("Piece.zig");
 const constant = @import("constant.zig");
 const DrawInterface = @import("interface.zig").DrawInterface;
 
-const Entity = enum {
-    Board,
-    Piece,
-};
-
-const Element = struct {
-    typ: Entity,
-    obj: *const c_void,
-};
-
+const Entity = enum { Board, Piece };
+const Element = struct { typ: Entity, obj: *const c_void };
 const Self = @This();
 
-window: ?*c.SDL_Window = null,
-renderer: ?*c.SDL_Renderer = null,
 fps_timer: Timer = undefined,
 cap_timer: Timer = undefined,
+window: ?*c.SDL_Window = null,
+elements: [2]Element = undefined,
+renderer: ?*c.SDL_Renderer = null,
 left_viewport: c.SDL_Rect = undefined,
 right_viewport: c.SDL_Rect = undefined,
 play_viewport: c.SDL_Rect = undefined,
-entities: [2]Element = undefined,
+allocator: *std.mem.Allocator = undefined,
 
-pub fn init() !Self {
+pub fn init(allocator: *std.mem.Allocator) !Self {
     if (c.SDL_Init(c.SDL_INIT_VIDEO) < 0) {
         err("Couldn't initialize SDL: {s}", .{c.SDL_GetError()});
         return error.ERROR_INIT_SDL;
     }
 
     var self = Self{
+        .allocator = allocator,
         .fps_timer = Timer.init(),
         .cap_timer = Timer.init(),
         .left_viewport = .{
@@ -75,14 +69,18 @@ pub fn init() !Self {
         return error.ERROR_CREATE_RENDERER;
     };
 
-    self.entities[0] = .{
-        .typ = .Board,
-        .obj = &Board.init(self.renderer.?),
-    };
+    var aBoard = try allocator.create(Board);
+    aBoard.* = Board.init(self.renderer.?); // need to do this, so Board is allocated on the Heap
 
-    self.entities[1] = .{
-        .typ = .Piece,
-        .obj = &try Piece.randomPiece(self.renderer.?, @intToPtr(*Board, @ptrToInt(self.entities[0].obj))),
+    var aPiece = try allocator.create(Piece);
+    aPiece.* = try Piece.randomPiece(self.renderer.?, aBoard);
+
+    self.elements = .{
+        // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // not working, cause this allocated Board on the Stack
+        // .{ .typ = .Piece, .obj = &try Piece.randomPiece(self.renderer.?, aBoard) }, // not working, cause this allocated Piece on the Stack
+
+        .{ .typ = .Board, .obj = aBoard },
+        .{ .typ = .Piece, .obj = aPiece },
     };
 
     return self;
@@ -91,7 +89,7 @@ pub fn init() !Self {
 pub fn loop(self: *Self) !void {
     self.cap_timer.startTimer();
 
-    var p = for (self.entities) |e| {
+    var p = for (self.elements) |e| {
         if (e.typ == .Piece) {
             break @intToPtr(*Piece, @ptrToInt(e.obj));
         }
@@ -164,7 +162,7 @@ fn renderGame(self: *Self) void {
         .h = constant.SCREEN_HEIGHT - constant.BLOCK * 2,
     });
 
-    for (self.entities) |e| {
+    for (self.elements) |e| {
         var obj_interface = switch (e.typ) {
             .Board => &(@intToPtr(*Board, @ptrToInt(e.obj))).interface,
             .Piece => &(@intToPtr(*Piece, @ptrToInt(e.obj))).interface,
