@@ -5,6 +5,8 @@ const c = @import("sdl.zig");
 const Timer = @import("Timer.zig");
 const Board = @import("Board.zig");
 const Piece = @import("Piece.zig");
+const BitmapFont = @import("BitmapFont.zig");
+const Texture = @import("Texture.zig");
 const constant = @import("constant.zig");
 const DrawInterface = @import("interface.zig").DrawInterface;
 
@@ -20,7 +22,11 @@ renderer: ?*c.SDL_Renderer = null,
 left_viewport: c.SDL_Rect = undefined,
 right_viewport: c.SDL_Rect = undefined,
 play_viewport: c.SDL_Rect = undefined,
+level_viewport: c.SDL_Rect = undefined,
+score_viewport: c.SDL_Rect = undefined,
+tetromino_viewport: c.SDL_Rect = undefined,
 allocator: *std.mem.Allocator = undefined,
+bitmap_font: BitmapFont = undefined,
 
 pub fn init(allocator: *std.mem.Allocator) !Self {
     if (c.SDL_Init(c.SDL_INIT_VIDEO) < 0) {
@@ -30,25 +36,44 @@ pub fn init(allocator: *std.mem.Allocator) !Self {
 
     var self = Self{
         .allocator = allocator,
+        .bitmap_font = BitmapFont.init(),
         .fps_timer = Timer.init(),
         .cap_timer = Timer.init(),
         .left_viewport = .{
             .x = 0,
             .y = 0,
-            .w = 360,
-            .h = constant.SCREEN_HEIGHT,
-        },
-        .right_viewport = .{
-            .x = 360,
-            .y = 0,
-            .w = 220,
+            .w = constant.BLOCK * 12,
             .h = constant.SCREEN_HEIGHT,
         },
         .play_viewport = .{
             .x = constant.BLOCK,
             .y = constant.BLOCK,
-            .w = 300,
-            .h = constant.SCREEN_HEIGHT - constant.BLOCK * 2,
+            .w = constant.BLOCK * 10,
+            .h = constant.BLOCK * constant.ROW,
+        },
+        .right_viewport = .{
+            .x = constant.BLOCK * 12,
+            .y = 0,
+            .w = constant.BLOCK * 7,
+            .h = constant.SCREEN_HEIGHT,
+        },
+        .level_viewport = .{
+            .x = constant.BLOCK * 12,
+            .y = constant.BLOCK,
+            .w = constant.VIEWPORT_INFO_WIDTH,
+            .h = constant.VIEWPORT_INFO_HEIGHT,
+        },
+        .score_viewport = .{
+            .x = constant.BLOCK * 12,
+            .y = constant.BLOCK * 8,
+            .w = constant.VIEWPORT_INFO_WIDTH,
+            .h = constant.VIEWPORT_INFO_HEIGHT,
+        },
+        .tetromino_viewport = .{
+            .x = constant.BLOCK * 12,
+            .y = constant.BLOCK * 15,
+            .w = constant.VIEWPORT_INFO_WIDTH,
+            .h = constant.VIEWPORT_INFO_HEIGHT,
         },
     };
 
@@ -69,11 +94,17 @@ pub fn init(allocator: *std.mem.Allocator) !Self {
         return error.ERROR_CREATE_RENDERER;
     };
 
+    var font_texture = try allocator.create(Texture);
+    font_texture.* = Texture.init(self.window.?, self.renderer.?);
+
+    try font_texture.loadFromFile("res/font.bmp");
+    try self.bitmap_font.buildFont(font_texture);
+
     var aBoard = try allocator.create(Board);
     aBoard.* = Board.init(self.renderer.?); // need to do this, so Board is allocated on the Heap
 
     var aPiece = try allocator.create(Piece);
-    aPiece.* = try Piece.randomPiece(self.renderer.?, aBoard);
+    aPiece.* = try Piece.randomPiece(self.renderer.?, aBoard); // need to do this, so Board is allocated on the Heap
 
     self.elements = .{
         // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // not working, cause this allocated Board on the Stack
@@ -128,7 +159,11 @@ fn handleInput(self: Self, _piece: *Piece) !bool {
 
             c.SDL_KEYDOWN => switch (e.key.keysym.sym) {
                 c.SDLK_ESCAPE => break true,
-                c.SDLK_UP => _piece.rotate(),
+                c.SDLK_UP => {
+                    if (e.key.repeat == 0) {
+                        _piece.rotate();
+                    }
+                },
                 c.SDLK_DOWN => try _piece.moveDown(),
                 c.SDLK_LEFT => _piece.moveLeft(),
                 c.SDLK_RIGHT => _piece.moveRight(),
@@ -168,13 +203,35 @@ fn renderGame(self: *Self) void {
             .Piece => &(@intToPtr(*Piece, @ptrToInt(e.obj))).interface,
         };
 
-        obj_interface.draw();
+        obj_interface.draw(Piece.View.PlayViewport);
     }
 
     // Right viewport
     _ = c.SDL_RenderSetViewport(self.renderer.?, &self.right_viewport);
-    _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0x00, 0x00, 0xFF, 0xFF);
-    _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = 220, .h = constant.SCREEN_HEIGHT });
+    _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0x00, 0x00, 0x00, 0xFF);
+    _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
+
+    // Level viewport
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.level_viewport);
+    _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0xFF, 0xFF, 0xFF, 0xFF);
+    _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
+    var txt_width = self.bitmap_font.calculateTextWidth("Level");
+    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 15, "Level");
+
+    // Score viewport
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.score_viewport);
+    _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0xFF, 0xFF, 0xFF, 0xFF);
+    _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
+    txt_width = self.bitmap_font.calculateTextWidth("Score");
+    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 15, "Score");
+
+    // Tetromino viewport
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.tetromino_viewport);
+    _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0xFF, 0xFF, 0xFF, 0xFF);
+    _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
+
+    // Draw next incoming piece
+    Piece.next_piece.interface.draw(Piece.View.TetrominoViewport);
 
     _ = c.SDL_RenderPresent(self.renderer.?);
 }

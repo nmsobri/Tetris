@@ -2,6 +2,7 @@ const std = @import("std");
 const mixin = @import("Mixin.zig");
 const c = @import("sdl.zig");
 const constant = @import("constant.zig");
+const Piece = @import("Piece.zig");
 const DrawInterface = @import("interface.zig").DrawInterface;
 
 const Self = @This();
@@ -19,17 +20,18 @@ pub fn init(renderer: *c.SDL_Renderer) Self {
     };
 }
 
-pub fn draw(inner: *DrawInterface) void {
+pub fn draw(inner: *DrawInterface, view: Piece.View) void {
     const self = @fieldParentPtr(Self, "interface", inner);
+    _ = view;
 
-    var row: u8 = 0;
+    var row: usize = 0;
     while (row < constant.ROW) : (row += 1) {
-        var col: u8 = 0;
+        var col: usize = 0;
         while (col < constant.COL) : (col += 1) {
             if (self.board[row][col] != null) {
-                self._draw(col, row, self.board[row][col].?);
+                self._draw(@intCast(c_int, col * constant.BLOCK), @intCast(c_int, row * constant.BLOCK), self.board[row][col].?);
             } else {
-                self._draw(col, row, .{ 255, 255, 255 });
+                self._draw(@intCast(c_int, col * constant.BLOCK), @intCast(c_int, row * constant.BLOCK), .{ 255, 255, 255 });
             }
         }
     }

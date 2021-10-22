@@ -3,10 +3,12 @@ const c = @import("sdl.zig");
 const t = @import("Tetromino.zig");
 const mixin = @import("Mixin.zig");
 const constant = @import("constant.zig");
+const Board = @import("Board.zig");
 const DrawInterface = @import("interface.zig").DrawInterface;
 
-const Board = @import("Board.zig");
 const Vacant = [3]u8{ 255, 255, 255 };
+pub var next_piece: Self = undefined;
+pub const View = enum { PlayViewport, TetrominoViewport };
 
 const Self = @This();
 
@@ -22,20 +24,20 @@ interface: DrawInterface,
 
 usingnamespace mixin.DrawMixin(Self);
 
-pub fn init(renderer: *c.SDL_Renderer, board: *Board, tetromino: t.Tetromino) Self {
+pub fn init(renderer: *c.SDL_Renderer, x: i8, y: i8, board: *Board, tetromino: t.Tetromino) Self {
     return Self{
-        .x = 3,
-        .y = -3,
+        .x = x,
+        .y = y,
         .board = board,
         .tetromino_index = 0,
-        .tetromino = tetromino,
         .renderer = renderer,
+        .tetromino = tetromino,
         .tetromino_layout = tetromino.layout[0],
         .interface = DrawInterface.init(draw),
     };
 }
 
-pub fn randomPiece(renderer: *c.SDL_Renderer, board: *Board) !Self {
+fn randomNumber() !u32 {
     var prng = std.rand.DefaultPrng.init(blk: {
         var seed: u64 = undefined;
         try std.os.getrandom(std.mem.asBytes(&seed));
@@ -43,11 +45,15 @@ pub fn randomPiece(renderer: *c.SDL_Renderer, board: *Board) !Self {
     });
 
     const rand = &prng.random;
-    const num = rand.uintLessThan(u32, t.Tetrominoes.len);
-    return Self.init(renderer, board, t.Tetrominoes[num]);
+    return rand.uintLessThan(u32, t.Tetrominoes.len);
 }
 
-pub fn draw(inner: *DrawInterface) void {
+pub fn randomPiece(renderer: *c.SDL_Renderer, board: *Board) !Self {
+    Self.next_piece = Self.init(renderer, 0, 0, board, t.Tetrominoes[try Self.randomNumber()]);
+    return Self.init(renderer, 3, -3, board, t.Tetrominoes[try randomNumber()]);
+}
+
+pub fn draw(inner: *DrawInterface, v: View) void {
     const self = @fieldParentPtr(Self, "interface", inner);
 
     var row: u8 = 0;
@@ -55,7 +61,16 @@ pub fn draw(inner: *DrawInterface) void {
         var col: u8 = 0;
         while (col < self.tetromino_layout[0].len) : (col += 1) {
             if (self.tetromino_layout[row][col]) {
-                self._draw(self.x + col, self.y + row, self.tetromino.color);
+                if (v == .PlayViewport) {
+                    self._draw((self.x + col) * constant.BLOCK, (self.y + row) * constant.BLOCK, self.tetromino.color);
+                } else {
+                    var viewport_x_space = @intToFloat(f32, constant.VIEWPORT_INFO_WIDTH - self.tetromino.width) / @as(f32, 2);
+                    var viewport_y_space = @intToFloat(f32, constant.VIEWPORT_INFO_HEIGHT - self.tetromino.height) / @as(f32, 2);
+
+                    var x = viewport_x_space + @intToFloat(f32, col * constant.BLOCK);
+                    var y = viewport_y_space + @intToFloat(f32, (row - self.tetromino.yoffset) * constant.BLOCK);
+                    self._draw(@floatToInt(c_int, x), @floatToInt(c_int, y), self.tetromino.color);
+                }
             }
         }
     }
@@ -67,21 +82,27 @@ pub fn moveDown(self: *Self) !void {
     } else {
         // we lock the piece and generate a new one
         self.lock();
-        self.* = try Self.randomPiece(self.renderer, self.board);
+
+        // Reset its position for play viewport
+        Self.next_piece.x = 3;
+        Self.next_piece.y = -3;
+
+        self.* = Self.next_piece;
+        Self.next_piece = Self.init(self.renderer, 0, 0, self.board, t.Tetrominoes[try randomNumber()]);
     }
 }
 
 pub fn moveRight(self: *Self) void {
     if (!self.collision(1, 0, self.tetromino_layout)) {
         self.x += 1;
-        self.interface.draw();
+        self.interface.draw(View.PlayViewport);
     }
 }
 
 pub fn moveLeft(self: *Self) void {
     if (!self.collision(-1, 0, self.tetromino_layout)) {
         self.x -= 1;
-        self.interface.draw();
+        self.interface.draw(View.PlayViewport);
     }
 }
 
@@ -103,7 +124,7 @@ pub fn rotate(self: *Self) void {
         self.x += kick;
         self.tetromino_index = @intCast(u32, (self.tetromino_index + 1) % self.tetromino.layout.len); // (0+1)%4 => 1
         self.tetromino_layout = self.tetromino.layout[self.tetromino_index];
-        self.interface.draw();
+        self.interface.draw(View.PlayViewport);
     }
 }
 

@@ -16,6 +16,7 @@ pub fn build(b: *std.build.Builder) void {
     // Link system lib
     exe.linkLibC();
     exe.linkSystemLibrary("SDL2");
+    exe.linkSystemLibrary("SDL2_image");
 
     // Copy dll to output dir
     b.installBinFile("./vendor/SDL2/lib/x64/SDL2.dll", "SDL2.dll");
