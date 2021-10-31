@@ -12,11 +12,10 @@ pub const View = enum { PlayViewport, TetrominoViewport };
 
 const Self = @This();
 
-board: *Board,
-renderer: *c.SDL_Renderer,
-
 x: i32 = undefined,
 y: i32 = undefined,
+board: *Board = undefined,
+renderer: *c.SDL_Renderer = undefined,
 tetromino: t.Tetromino = undefined,
 tetromino_index: u32 = undefined,
 tetromino_layout: t.TetrominoLayout = undefined,
@@ -44,7 +43,7 @@ fn randomNumber() !u32 {
         break :blk seed;
     });
 
-    const rand = &prng.random;
+    const rand = prng.random();
     return rand.uintLessThan(u32, t.Tetrominoes.len);
 }
 
@@ -83,7 +82,7 @@ pub fn moveDown(self: *Self) !void {
         // we lock the piece and generate a new one
         self.lock();
 
-        // Reset its position for play viewport
+        // Reset piece position for play viewport
         Self.next_piece.x = 3;
         Self.next_piece.y = -3;
 
@@ -110,9 +109,10 @@ pub fn rotate(self: *Self) void {
     const next_layout = self.tetromino.layout[(self.tetromino_index + 1) % self.tetromino.layout.len];
     var kick: i8 = 0;
 
+    // Check if rotation at current position cause blocking, if yes, then kick it one block to left/right based on its x position
     if (self.collision(0, 0, next_layout)) {
         if (self.x > constant.COL / 2) {
-            // it's the right wall
+            // it's the right wallgg
             kick = -1; // we need to move the piece to the left
         } else {
             // it's the left wall
@@ -149,7 +149,7 @@ pub fn lock(self: *Self) void {
         }
     }
 
-    // remove full row
+    // check if there is full row, if its, remove full row
     self.remove();
 }
 
@@ -166,10 +166,17 @@ pub fn remove(self: Self) void {
         if (is_row_full) {
             // if the row is full, we move down all the rows above it
             var top_row = row;
-            while (top_row > 1) : (top_row -= 1) {
+
+            while (top_row >= 1) : (top_row -= 1) {
                 var top_col: u8 = 0;
                 while (top_col < constant.COL) : (top_col += 1) {
                     self.board.board[top_row][top_col] = self.board.board[top_row - 1][top_col];
+                }
+            } else {
+                // this is the very first row, so there is no more row above it, so just vacant the entire row
+                var top_col: u8 = 0;
+                while (top_col < constant.COL) : (top_col += 1) {
+                    self.board.board[top_row][top_col] = null;
                 }
             }
         }
@@ -191,7 +198,7 @@ pub fn collision(self: Self, x: i32, y: i32, tetromino: t.TetrominoLayout) bool 
             const new_x = self.x + col + x;
             const new_y = self.y + row + y;
 
-            // conditions
+            // conditions, collided with the viewport
             if (new_x < 0 or new_x >= constant.COL or new_y >= constant.ROW) {
                 return true;
             }
