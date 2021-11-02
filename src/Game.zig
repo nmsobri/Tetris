@@ -14,6 +14,48 @@ const Entity = enum { Board, Piece };
 const Element = struct { typ: Entity, obj: *const c_void };
 const Self = @This();
 
+const left_viewport: c.SDL_Rect = .{
+    .x = 0,
+    .y = 0,
+    .w = constant.BLOCK * 12,
+    .h = constant.SCREEN_HEIGHT,
+};
+
+const play_viewport: c.SDL_Rect = .{
+    .x = constant.BLOCK,
+    .y = constant.BLOCK,
+    .w = constant.BLOCK * 10,
+    .h = constant.BLOCK * constant.ROW,
+};
+
+const right_viewport: c.SDL_Rect = .{
+    .x = constant.BLOCK * 12,
+    .y = 0,
+    .w = constant.BLOCK * 7,
+    .h = constant.SCREEN_HEIGHT,
+};
+
+const level_viewport: c.SDL_Rect = .{
+    .x = constant.BLOCK * 12,
+    .y = constant.BLOCK,
+    .w = constant.VIEWPORT_INFO_WIDTH,
+    .h = constant.VIEWPORT_INFO_HEIGHT,
+};
+
+const score_viewport: c.SDL_Rect = .{
+    .x = constant.BLOCK * 12,
+    .y = constant.BLOCK * 8,
+    .w = constant.VIEWPORT_INFO_WIDTH,
+    .h = constant.VIEWPORT_INFO_HEIGHT,
+};
+
+const tetromino_viewport: c.SDL_Rect = .{
+    .x = constant.BLOCK * 12,
+    .y = constant.BLOCK * 15,
+    .w = constant.VIEWPORT_INFO_WIDTH,
+    .h = constant.VIEWPORT_INFO_HEIGHT,
+};
+
 pub var Score: u32 = 0;
 pub var Level: u8 = 1;
 
@@ -22,12 +64,6 @@ cap_timer: Timer = undefined,
 window: ?*c.SDL_Window = null,
 elements: [2]Element = undefined,
 renderer: ?*c.SDL_Renderer = null,
-left_viewport: c.SDL_Rect = undefined,
-right_viewport: c.SDL_Rect = undefined,
-play_viewport: c.SDL_Rect = undefined,
-level_viewport: c.SDL_Rect = undefined,
-score_viewport: c.SDL_Rect = undefined,
-tetromino_viewport: c.SDL_Rect = undefined,
 allocator: *std.mem.Allocator = undefined,
 bitmap_font: BitmapFont = undefined,
 
@@ -42,42 +78,6 @@ pub fn init(allocator: *std.mem.Allocator) !Self {
         .bitmap_font = BitmapFont.init(),
         .fps_timer = Timer.init(),
         .cap_timer = Timer.init(),
-        .left_viewport = .{
-            .x = 0,
-            .y = 0,
-            .w = constant.BLOCK * 12,
-            .h = constant.SCREEN_HEIGHT,
-        },
-        .play_viewport = .{
-            .x = constant.BLOCK,
-            .y = constant.BLOCK,
-            .w = constant.BLOCK * 10,
-            .h = constant.BLOCK * constant.ROW,
-        },
-        .right_viewport = .{
-            .x = constant.BLOCK * 12,
-            .y = 0,
-            .w = constant.BLOCK * 7,
-            .h = constant.SCREEN_HEIGHT,
-        },
-        .level_viewport = .{
-            .x = constant.BLOCK * 12,
-            .y = constant.BLOCK,
-            .w = constant.VIEWPORT_INFO_WIDTH,
-            .h = constant.VIEWPORT_INFO_HEIGHT,
-        },
-        .score_viewport = .{
-            .x = constant.BLOCK * 12,
-            .y = constant.BLOCK * 8,
-            .w = constant.VIEWPORT_INFO_WIDTH,
-            .h = constant.VIEWPORT_INFO_HEIGHT,
-        },
-        .tetromino_viewport = .{
-            .x = constant.BLOCK * 12,
-            .y = constant.BLOCK * 15,
-            .w = constant.VIEWPORT_INFO_WIDTH,
-            .h = constant.VIEWPORT_INFO_HEIGHT,
-        },
     };
 
     self.window = c.SDL_CreateWindow(
@@ -112,7 +112,6 @@ pub fn init(allocator: *std.mem.Allocator) !Self {
     self.elements = .{
         // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // not working, cause this allocated Board on the Stack
         // .{ .typ = .Piece, .obj = &try Piece.randomPiece(self.renderer.?, aBoard) }, // not working, cause this allocated Piece on the Stack
-
         .{ .typ = .Board, .obj = aBoard },
         .{ .typ = .Piece, .obj = aPiece },
     };
@@ -186,12 +185,12 @@ fn renderGame(self: *Self) !void {
     _ = c.SDL_RenderClear(self.renderer.?);
 
     // Left viewport
-    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.left_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &Self.left_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0x00, 0x00, 0x00, 0x00);
     _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = 360, .h = constant.SCREEN_HEIGHT });
 
     // Play viewport
-    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.play_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &Self.play_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0x00, 0xFF, 0x00, 0xFF);
     _ = c.SDL_RenderDrawRect(self.renderer.?, &.{
         .x = 0,
@@ -210,12 +209,12 @@ fn renderGame(self: *Self) !void {
     }
 
     // Right viewport
-    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.right_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &Self.right_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0x00, 0x00, 0x00, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     // Level viewport
-    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.level_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &Self.level_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
@@ -227,7 +226,7 @@ fn renderGame(self: *Self) !void {
     self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
 
     // Score viewport
-    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.score_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &Self.score_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
@@ -239,7 +238,7 @@ fn renderGame(self: *Self) !void {
     self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
 
     // Tetromino viewport
-    _ = c.SDL_RenderSetViewport(self.renderer.?, &self.tetromino_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer.?, &Self.tetromino_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer.?, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer.?, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
