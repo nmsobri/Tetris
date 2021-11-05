@@ -56,9 +56,8 @@ const tetromino_viewport: c.SDL_Rect = .{
     .h = constant.VIEWPORT_INFO_HEIGHT,
 };
 
-pub var Score: u32 = 0;
-pub var Level: u8 = 1;
-
+level: u8 = 1,
+score: u32 = 0,
 fps_timer: Timer = undefined,
 cap_timer: Timer = undefined,
 window: ?*c.SDL_Window = null,
@@ -67,13 +66,14 @@ renderer: ?*c.SDL_Renderer = null,
 allocator: *std.mem.Allocator = undefined,
 bitmap_font: BitmapFont = undefined,
 
-pub fn init(allocator: *std.mem.Allocator) !Self {
+pub fn init(allocator: *std.mem.Allocator) !*Self {
     if (c.SDL_Init(c.SDL_INIT_VIDEO) < 0) {
         err("Couldn't initialize SDL: {s}", .{c.SDL_GetError()});
         return error.ERROR_INIT_SDL;
     }
 
-    var self = Self{
+    var self = try allocator.create(Self);
+    self.* = Self{
         .allocator = allocator,
         .bitmap_font = BitmapFont.init(),
         .fps_timer = Timer.init(),
@@ -97,23 +97,23 @@ pub fn init(allocator: *std.mem.Allocator) !Self {
         return error.ERROR_CREATE_RENDERER;
     };
 
-    var font_texture = try allocator.create(Texture);
-    font_texture.* = Texture.init(self.window.?, self.renderer.?);
+    var ptr_font_texture = try allocator.create(Texture);
+    ptr_font_texture.* = Texture.init(self.window.?, self.renderer.?);
 
-    try font_texture.loadFromFile("res/font.bmp");
-    try self.bitmap_font.buildFont(font_texture);
+    try ptr_font_texture.loadFromFile("res/font.bmp");
+    try self.bitmap_font.buildFont(ptr_font_texture);
 
-    var aBoard = try allocator.create(Board);
-    aBoard.* = Board.init(self.renderer.?); // need to do this, so Board is allocated on the Heap
+    var ptr_board = try allocator.create(Board);
+    ptr_board.* = Board.init(self.renderer.?); // need to do this, so Board is allocated on the Heap
 
-    var aPiece = try allocator.create(Piece);
-    aPiece.* = try Piece.randomPiece(self.renderer.?, aBoard); // need to do this, so Board is allocated on the Heap
+    var ptr_piece = try allocator.create(Piece);
+    ptr_piece.* = try Piece.randomPiece(self.renderer.?, ptr_board, &self.score); // need to do this, so Board is allocated on the Heap
 
     self.elements = .{
         // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // not working, cause this allocated Board on the Stack
         // .{ .typ = .Piece, .obj = &try Piece.randomPiece(self.renderer.?, aBoard) }, // not working, cause this allocated Piece on the Stack
-        .{ .typ = .Board, .obj = aBoard },
-        .{ .typ = .Piece, .obj = aPiece },
+        .{ .typ = .Board, .obj = ptr_board },
+        .{ .typ = .Piece, .obj = ptr_piece },
     };
 
     return self;
@@ -137,7 +137,10 @@ pub fn loop(self: *Self) !void {
 
         const elapsed_time = self.cap_timer.getTicks();
         if (elapsed_time >= 1000) {
-            try p.moveDown();
+            if ((try p.moveDown()) == false) {
+                break :mainloop;
+            }
+
             self.cap_timer.startTimer();
         }
 
@@ -151,7 +154,7 @@ pub fn loop(self: *Self) !void {
     }
 }
 
-fn handleInput(self: Self, _piece: *Piece) !bool {
+fn handleInput(self: Self, p: *Piece) !bool {
     _ = self;
     var e: c.SDL_Event = undefined;
 
@@ -163,12 +166,16 @@ fn handleInput(self: Self, _piece: *Piece) !bool {
                 c.SDLK_ESCAPE => break true,
                 c.SDLK_UP => {
                     if (e.key.repeat == 0) {
-                        _piece.rotate();
+                        p.rotate();
                     }
                 },
-                c.SDLK_DOWN => try _piece.moveDown(),
-                c.SDLK_LEFT => _piece.moveLeft(),
-                c.SDLK_RIGHT => _piece.moveRight(),
+                c.SDLK_DOWN => {
+                    if ((try p.moveDown()) == false) {
+                        return false;
+                    }
+                },
+                c.SDLK_LEFT => p.moveLeft(),
+                c.SDLK_RIGHT => p.moveRight(),
                 else => {},
             },
             else => {},
@@ -221,7 +228,7 @@ fn renderGame(self: *Self) !void {
     var txt_width = self.bitmap_font.calculateTextWidth("Level");
     self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level");
 
-    var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{Self.Level});
+    var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.level});
     txt_width = self.bitmap_font.calculateTextWidth(level_txt);
     self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
 
@@ -233,7 +240,7 @@ fn renderGame(self: *Self) !void {
     txt_width = self.bitmap_font.calculateTextWidth("Score");
     self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score");
 
-    var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{Self.Score});
+    var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.score});
     txt_width = self.bitmap_font.calculateTextWidth(score_txt);
     self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
 

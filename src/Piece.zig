@@ -20,10 +20,11 @@ tetromino: t.Tetromino = undefined,
 tetromino_index: u32 = undefined,
 tetromino_layout: t.TetrominoLayout = undefined,
 interface: DrawInterface,
+score: *u32,
 
 usingnamespace mixin.DrawMixin(Self);
 
-pub fn init(renderer: *c.SDL_Renderer, x: i8, y: i8, board: *Board, tetromino: t.Tetromino) Self {
+pub fn init(renderer: *c.SDL_Renderer, x: i8, y: i8, board: *Board, tetromino: t.Tetromino, score: *u32) Self {
     return Self{
         .x = x,
         .y = y,
@@ -33,6 +34,7 @@ pub fn init(renderer: *c.SDL_Renderer, x: i8, y: i8, board: *Board, tetromino: t
         .tetromino = tetromino,
         .tetromino_layout = tetromino.layout[0],
         .interface = DrawInterface.init(draw),
+        .score = score,
     };
 }
 
@@ -47,9 +49,9 @@ fn randomNumber() !u32 {
     return rand.uintLessThan(u32, t.Tetrominoes.len);
 }
 
-pub fn randomPiece(renderer: *c.SDL_Renderer, board: *Board) !Self {
-    Self.next_piece = Self.init(renderer, 0, 0, board, t.Tetrominoes[try Self.randomNumber()]);
-    return Self.init(renderer, 3, -3, board, t.Tetrominoes[try randomNumber()]);
+pub fn randomPiece(renderer: *c.SDL_Renderer, board: *Board, score: *u32) !Self {
+    Self.next_piece = Self.init(renderer, 0, 0, board, t.Tetrominoes[try Self.randomNumber()], score);
+    return Self.init(renderer, 3, -3, board, t.Tetrominoes[try randomNumber()], score);
 }
 
 pub fn draw(inner: *DrawInterface, v: View) void {
@@ -75,20 +77,24 @@ pub fn draw(inner: *DrawInterface, v: View) void {
     }
 }
 
-pub fn moveDown(self: *Self) !void {
+pub fn moveDown(self: *Self) !bool {
     if (!self.collision(0, 1, self.tetromino_layout)) {
         self.y += 1;
     } else {
         // we lock the piece and generate a new one
-        self.lock();
+        if (self.lock() == false) {
+            return false;
+        }
 
         // Reset piece position for play viewport
         Self.next_piece.x = 3;
         Self.next_piece.y = -3;
 
         self.* = Self.next_piece;
-        Self.next_piece = Self.init(self.renderer, 0, 0, self.board, t.Tetrominoes[try randomNumber()]);
+        Self.next_piece = Self.init(self.renderer, 0, 0, self.board, t.Tetrominoes[try randomNumber()], self.score);
     }
+
+    return true;
 }
 
 pub fn moveRight(self: *Self) void {
@@ -128,7 +134,7 @@ pub fn rotate(self: *Self) void {
     }
 }
 
-pub fn lock(self: *Self) void {
+pub fn lock(self: *Self) bool {
     var row: u8 = 0;
     while (row < self.tetromino_layout.len) : (row += 1) {
         var col: u8 = 0;
@@ -141,8 +147,8 @@ pub fn lock(self: *Self) void {
             // pieces to lock on top = game over
             if (self.y + row < 0) {
                 // stop request animation frame
-                // gameOver = true;
-                break;
+                // game over
+                return false;
             }
             // we lock the piece
             self.board.board[@intCast(usize, self.y + row)][@intCast(usize, self.x + col)] = self.tetromino.color;
@@ -151,6 +157,7 @@ pub fn lock(self: *Self) void {
 
     // check if there is full row, if its, remove full row
     self.remove();
+    return true;
 }
 
 pub fn remove(self: Self) void {
@@ -166,6 +173,7 @@ pub fn remove(self: Self) void {
         if (is_row_full) {
             // if the row is full, we move down all the rows above it
             var top_row = row;
+            self.score.* += 10;
 
             while (top_row >= 1) : (top_row -= 1) {
                 var top_col: u8 = 0;
