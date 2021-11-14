@@ -1,7 +1,7 @@
 const std = @import("std");
 const Game = @import("Game.zig");
 
-pub fn main() anyerror!void {
+pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
