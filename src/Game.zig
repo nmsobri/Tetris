@@ -5,15 +5,14 @@ const c = @import("sdl.zig");
 const Timer = @import("Timer.zig");
 const constant = @import("constant.zig");
 const StateMachine = @import("StateMachine.zig");
-const PlayState = @import("PlayState.zig");
-const PauseState = @import("PauseState.zig");
+const StartState = @import("StartState.zig");
 const Self = @This();
 
 fps_timer: Timer = undefined,
 window: ?*c.SDL_Window = null,
 renderer: ?*c.SDL_Renderer = null,
 allocator: *std.mem.Allocator = undefined,
-state_machine: StateMachine = undefined,
+state_machine: *StateMachine = undefined,
 
 pub fn init(allocator: *std.mem.Allocator) !Self {
     if (c.SDL_Init(c.SDL_INIT_VIDEO) < 0) {
@@ -43,13 +42,13 @@ pub fn init(allocator: *std.mem.Allocator) !Self {
         return error.ERROR_CREATE_RENDERER;
     };
 
-    self.state_machine = StateMachine.init(allocator);
+    self.state_machine = try allocator.create(StateMachine);
+    self.state_machine.* = StateMachine.init(allocator);
 
-    var play_state = try allocator.create(*PlayState);
-    play_state.* = try PlayState.init(allocator, self.window.?, self.renderer.?, self.state_machine);
+    var start_state = try allocator.create(*StartState);
+    start_state.* = try StartState.init(allocator, self.window.?, self.renderer.?, self.state_machine);
 
-    try self.state_machine.changeState(&play_state.*.*.interface);
-
+    try self.state_machine.changeState(&start_state.*.*.interface);
     return self;
 }
 

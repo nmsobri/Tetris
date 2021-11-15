@@ -31,7 +31,7 @@ pub fn changeState(self: *Self, state: *StateInterfce) !void {
     _ = try self.states.items[self.states.items.len - 1].onEnter();
 }
 
-pub fn popState(self: *Self) void {
+pub fn popState(self: *Self) !void {
     if (self.states.items.len != 0) {
         if (try self.states.items[self.states.items.len - 1].onExit()) {
             _ = self.states.pop();

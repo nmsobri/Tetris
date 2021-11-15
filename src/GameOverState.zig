@@ -8,8 +8,9 @@ const Piece = @import("Piece.zig");
 const BitmapFont = @import("BitmapFont.zig");
 const Texture = @import("Texture.zig");
 const constant = @import("constant.zig");
-const StateInterfce = @import("interface.zig").StateInterface;
+const StateInterface = @import("interface.zig").StateInterface;
 const StateMachine = @import("StateMachine.zig");
+const PlayState = @import("PlayState.zig");
 
 const Entity = enum { Board, Piece };
 const Element = struct { typ: Entity, obj: *const c_void };
@@ -60,7 +61,7 @@ const tetromino_viewport: c.SDL_Rect = .{
 window: *c.SDL_Window = null,
 renderer: *c.SDL_Renderer = null,
 allocator: *std.mem.Allocator = undefined,
-interface: StateInterfce = undefined,
+interface: StateInterface = undefined,
 state_machine: *StateMachine = undefined,
 
 pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *StateMachine) !*Self {
@@ -70,14 +71,14 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
         .window = window,
         .renderer = renderer,
         .allocator = allocator,
-        .interface = StateInterfce.init(updateFn, renderFn, onEnterFn, onExitFn, inputFn, stateIDFn),
+        .interface = StateInterface.init(updateFn, renderFn, onEnterFn, onExitFn, inputFn, stateIDFn),
         .state_machine = state_machine,
     };
 
     return self;
 }
 
-fn inputFn(child: *StateInterfce) !void {
+fn inputFn(child: *StateInterface) !void {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = self;
     var evt: c.SDL_Event = undefined;
@@ -91,7 +92,9 @@ fn inputFn(child: *StateInterfce) !void {
             c.SDL_KEYDOWN => switch (evt.key.keysym.sym) {
                 c.SDLK_ESCAPE => std.os.exit(0),
                 c.SDLK_RETURN, c.SDLK_KP_ENTER => {
-                    try self.state_machine.popState();
+                    var play_state = try self.allocator.create(*PlayState);
+                    play_state.* = try PlayState.init(self.allocator, self.window, self.renderer, self.state_machine);
+                    try self.state_machine.pushState(&play_state.*.*.interface);
                 },
                 else => {},
             },
@@ -100,12 +103,12 @@ fn inputFn(child: *StateInterfce) !void {
     }
 }
 
-fn updateFn(child: *StateInterfce) !void {
+fn updateFn(child: *StateInterface) !void {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = self;
 }
 
-fn renderFn(child: *StateInterfce) !void {
+fn renderFn(child: *StateInterface) !void {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0x00, 0x00, 0x00, 0x00);
     _ = c.SDL_RenderClear(self.renderer);
@@ -165,19 +168,19 @@ fn renderFn(child: *StateInterfce) !void {
     _ = c.SDL_RenderPresent(self.renderer);
 }
 
-fn onEnterFn(child: *StateInterfce) !bool {
+fn onEnterFn(child: *StateInterface) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = self;
     return true;
 }
 
-fn onExitFn(child: *StateInterfce) !bool {
+fn onExitFn(child: *StateInterface) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = self;
     return true;
 }
 
-fn stateIDFn(child: *StateInterfce) []const u8 {
+fn stateIDFn(child: *StateInterface) []const u8 {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = self;
     return "Pause";

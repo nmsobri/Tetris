@@ -11,6 +11,7 @@ const constant = @import("constant.zig");
 const StateInterfce = @import("interface.zig").StateInterface;
 const Statemachine = @import("StateMachine.zig");
 const PauseState = @import("PauseState.zig");
+const GameOverState = @import("GameOverState.zig");
 
 const Entity = enum { Board, Piece };
 const Element = struct { typ: Entity, obj: *const c_void };
@@ -67,9 +68,9 @@ renderer: *c.SDL_Renderer = null,
 allocator: *std.mem.Allocator = undefined,
 bitmap_font: BitmapFont = undefined,
 interface: StateInterfce = undefined,
-state_machine: Statemachine = undefined,
+state_machine: *Statemachine = undefined,
 
-pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: Statemachine) !*Self {
+pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *Statemachine) !*Self {
     var self = try allocator.create(Self);
 
     self.* = Self{
@@ -123,7 +124,7 @@ fn inputFn(child: *StateInterfce) !void {
             c.SDL_KEYDOWN => switch (evt.key.keysym.sym) {
                 c.SDLK_ESCAPE => {
                     var pause_state = try self.allocator.create(*PauseState);
-                    pause_state.* = try PauseState.init(self.allocator, self.window, self.renderer);
+                    pause_state.* = try PauseState.init(self.allocator, self.window, self.renderer, self.state_machine);
                     try self.state_machine.pushState(&pause_state.*.*.interface);
                 },
                 c.SDLK_UP => {
@@ -157,7 +158,9 @@ fn updateFn(child: *StateInterfce) !void {
     const elapsed_time = self.cap_timer.getTicks();
     if (elapsed_time >= 1000) {
         if ((try p.moveDown()) == false) {
-            std.os.exit(0);
+            var game_over_state = try self.allocator.create(*GameOverState);
+            game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
+            try self.state_machine.changeState(&game_over_state.*.*.interface);
         }
 
         self.cap_timer.startTimer();
