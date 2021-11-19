@@ -7,14 +7,13 @@ const Board = @import("Board.zig");
 const DrawInterface = @import("interface.zig").DrawInterface;
 
 const Vacant = [3]u8{ 255, 255, 255 };
-pub var next_piece: Self = undefined;
+pub var next_piece: ?Self = null;
 pub const View = enum { PlayViewport, TetrominoViewport };
 
 const Self = @This();
 
 x: i32 = undefined,
 y: i32 = undefined,
-board: *Board = undefined,
 renderer: *c.SDL_Renderer = undefined,
 tetromino: t.Tetromino = undefined,
 tetromino_index: u32 = undefined,
@@ -24,11 +23,10 @@ score: *u32,
 
 usingnamespace mixin.DrawMixin(Self);
 
-pub fn init(renderer: *c.SDL_Renderer, x: i8, y: i8, board: *Board, tetromino: t.Tetromino, score: *u32) Self {
+pub fn init(renderer: *c.SDL_Renderer, x: i8, y: i8, tetromino: t.Tetromino, score: *u32) Self {
     return Self{
         .x = x,
         .y = y,
-        .board = board,
         .tetromino_index = 0,
         .renderer = renderer,
         .tetromino = tetromino,
@@ -49,9 +47,9 @@ fn randomNumber() !u32 {
     return rand.uintLessThan(u32, t.Tetrominoes.len);
 }
 
-pub fn randomPiece(renderer: *c.SDL_Renderer, board: *Board, score: *u32) !Self {
-    Self.next_piece = Self.init(renderer, 0, 0, board, t.Tetrominoes[try Self.randomNumber()], score);
-    return Self.init(renderer, 3, -3, board, t.Tetrominoes[try randomNumber()], score);
+pub fn randomPiece(renderer: *c.SDL_Renderer, score: *u32) !Self {
+    Self.next_piece = Self.init(renderer, 0, 0, t.Tetrominoes[try Self.randomNumber()], score);
+    return Self.init(renderer, 3, -3, t.Tetrominoes[try randomNumber()], score);
 }
 
 pub fn draw(inner: *DrawInterface, v: View) void {
@@ -77,46 +75,73 @@ pub fn draw(inner: *DrawInterface, v: View) void {
     }
 }
 
-pub fn moveDown(self: *Self) !bool {
-    if (!self.collision(0, 1, self.tetromino_layout)) {
+pub fn drawRandomPiece(renderer: *c.SDL_Renderer, view: Self.View) !void {
+    if (Self.next_piece == null) {
+        var score: u32 = 0;
+        Self.next_piece = Self.init(renderer, 0, 0, t.Tetrominoes[try Self.randomNumber()], &score);
+    }
+
+    Self.next_piece.?.interface.draw(view);
+}
+
+pub fn hardDrop(self: *Self, board: *Board) !bool {
+    while (self.collision(board, 0, 1, self.tetromino_layout) == false) {
+        self.y += 1;
+    }
+
+    if (self.lock(board) == false) {
+        return false;
+    }
+
+    // Reset piece position for play viewport
+    Self.next_piece.?.x = 3;
+    Self.next_piece.?.y = -3;
+
+    self.* = Self.next_piece.?;
+    Self.next_piece = Self.init(self.renderer, 0, 0, t.Tetrominoes[try randomNumber()], self.score);
+    return true;
+}
+
+pub fn moveDown(self: *Self, board: *Board) !bool {
+    if (!self.collision(board, 0, 1, self.tetromino_layout)) {
         self.y += 1;
     } else {
         // we lock the piece and generate a new one
-        if (self.lock() == false) {
+        if (self.lock(board) == false) {
             return false;
         }
 
         // Reset piece position for play viewport
-        Self.next_piece.x = 3;
-        Self.next_piece.y = -3;
+        Self.next_piece.?.x = 3;
+        Self.next_piece.?.y = -3;
 
-        self.* = Self.next_piece;
-        Self.next_piece = Self.init(self.renderer, 0, 0, self.board, t.Tetrominoes[try randomNumber()], self.score);
+        self.* = Self.next_piece.?;
+        Self.next_piece = Self.init(self.renderer, 0, 0, t.Tetrominoes[try randomNumber()], self.score);
     }
 
     return true;
 }
 
-pub fn moveRight(self: *Self) void {
-    if (!self.collision(1, 0, self.tetromino_layout)) {
+pub fn moveRight(self: *Self, board: *Board) void {
+    if (!self.collision(board, 1, 0, self.tetromino_layout)) {
         self.x += 1;
         self.interface.draw(View.PlayViewport);
     }
 }
 
-pub fn moveLeft(self: *Self) void {
-    if (!self.collision(-1, 0, self.tetromino_layout)) {
+pub fn moveLeft(self: *Self, board: *Board) void {
+    if (!self.collision(board, -1, 0, self.tetromino_layout)) {
         self.x -= 1;
         self.interface.draw(View.PlayViewport);
     }
 }
 
-pub fn rotate(self: *Self) void {
+pub fn rotate(self: *Self, board: *Board) void {
     const next_layout = self.tetromino.layout[(self.tetromino_index + 1) % self.tetromino.layout.len];
     var kick: i8 = 0;
 
     // Check if rotation at current position cause blocking, if yes, then kick it one block to left/right based on its x position
-    if (self.collision(0, 0, next_layout)) {
+    if (self.collision(board, 0, 0, next_layout)) {
         if (self.x > constant.COL / 2) {
             // it's the right wallgg
             kick = -1; // we need to move the piece to the left
@@ -126,7 +151,7 @@ pub fn rotate(self: *Self) void {
         }
     }
 
-    if (!self.collision(kick, 0, next_layout)) {
+    if (!self.collision(board, kick, 0, next_layout)) {
         self.x += kick;
         self.tetromino_index = @intCast(u32, (self.tetromino_index + 1) % self.tetromino.layout.len); // (0+1)%4 => 1
         self.tetromino_layout = self.tetromino.layout[self.tetromino_index];
@@ -134,7 +159,7 @@ pub fn rotate(self: *Self) void {
     }
 }
 
-pub fn lock(self: *Self) bool {
+pub fn lock(self: *Self, board: *Board) bool {
     var row: u8 = 0;
     while (row < self.tetromino_layout.len) : (row += 1) {
         var col: u8 = 0;
@@ -151,23 +176,23 @@ pub fn lock(self: *Self) bool {
                 return false;
             }
             // we lock the piece
-            self.board.board[@intCast(usize, self.y + row)][@intCast(usize, self.x + col)] = self.tetromino.color;
+            board.board[@intCast(usize, self.y + row)][@intCast(usize, self.x + col)] = self.tetromino.color;
         }
     }
 
     // check if there is full row, if its, remove full row
-    self.remove();
+    self.remove(board);
     return true;
 }
 
-pub fn remove(self: Self) void {
+pub fn remove(self: Self, board: *Board) void {
     // remove full rows
     var row: u8 = 0;
     while (row < constant.ROW) : (row += 1) {
         var col: u8 = 0;
 
         var is_row_full = while (col < constant.COL) : (col += 1) {
-            if (self.board.board[row][col] == null) break false;
+            if (board.board[row][col] == null) break false;
         } else true;
 
         if (is_row_full) {
@@ -178,20 +203,20 @@ pub fn remove(self: Self) void {
             while (top_row >= 1) : (top_row -= 1) {
                 var top_col: u8 = 0;
                 while (top_col < constant.COL) : (top_col += 1) {
-                    self.board.board[top_row][top_col] = self.board.board[top_row - 1][top_col];
+                    board.board[top_row][top_col] = board.board[top_row - 1][top_col];
                 }
             } else {
                 // this is the very first row, so there is no more row above it, so just vacant the entire row
                 var top_col: u8 = 0;
                 while (top_col < constant.COL) : (top_col += 1) {
-                    self.board.board[top_row][top_col] = null;
+                    board.board[top_row][top_col] = null;
                 }
             }
         }
     }
 }
 
-pub fn collision(self: Self, x: i32, y: i32, tetromino: t.TetrominoLayout) bool {
+pub fn collision(self: Self, board: *Board, x: i32, y: i32, tetromino: t.TetrominoLayout) bool {
     var row: u8 = 0;
     while (row < tetromino.len) : (row += 1) {
         var col: u8 = 0;
@@ -217,7 +242,7 @@ pub fn collision(self: Self, x: i32, y: i32, tetromino: t.TetrominoLayout) bool 
             }
 
             // check if there is a locked tetromino alrady in place
-            if (self.board.board[@intCast(usize, new_y)][@intCast(usize, new_x)] != null) {
+            if (board.board[@intCast(usize, new_y)][@intCast(usize, new_x)] != null) {
                 return true;
             }
         }

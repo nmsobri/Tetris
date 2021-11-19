@@ -93,7 +93,7 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
     ptr_board.* = Board.init(self.renderer); // need to do this, so Board is allocated on the Heap
 
     var ptr_piece = try allocator.create(Piece);
-    ptr_piece.* = try Piece.randomPiece(self.renderer, ptr_board, &self.score); // need to do this, so Board is allocated on the Heap
+    ptr_piece.* = try Piece.randomPiece(self.renderer, &self.score); // need to do this, so Board is allocated on the Heap
 
     self.elements = .{
         // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // not working, cause this allocated Board on the Stack
@@ -115,6 +115,12 @@ fn inputFn(child: *StateInterfce) !void {
         }
     } else unreachable;
 
+    var board = for (self.elements) |elem| {
+        if (elem.typ == .Board) {
+            break @intToPtr(*Board, @ptrToInt(elem.obj));
+        }
+    } else unreachable;
+
     while (c.SDL_PollEvent(&evt) > 0) {
         switch (evt.type) {
             c.SDL_QUIT => {
@@ -127,18 +133,24 @@ fn inputFn(child: *StateInterfce) !void {
                     pause_state.* = try PauseState.init(self.allocator, self.window, self.renderer, self.state_machine);
                     try self.state_machine.pushState(&pause_state.*.*.interface);
                 },
+                c.SDLK_SPACE => {
+                    _ = try piece.hardDrop(board);
+                },
                 c.SDLK_UP => {
                     if (evt.key.repeat == 0) {
-                        piece.rotate();
+                        piece.rotate(board);
                     }
                 },
                 c.SDLK_DOWN => {
-                    if ((try piece.moveDown()) == false) {
-                        std.os.exit(0);
+                    if ((try piece.moveDown(board)) == false) {
+                        var game_over_state = try self.allocator.create(*GameOverState);
+                        game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
+                        try self.state_machine.changeState(&game_over_state.*.*.interface);
+                        // std.os.exit(0);
                     }
                 },
-                c.SDLK_LEFT => piece.moveLeft(),
-                c.SDLK_RIGHT => piece.moveRight(),
+                c.SDLK_LEFT => piece.moveLeft(board),
+                c.SDLK_RIGHT => piece.moveRight(board),
                 else => {},
             },
             else => {},
@@ -155,9 +167,15 @@ fn updateFn(child: *StateInterfce) !void {
         }
     } else unreachable;
 
+    var b = for (self.elements) |elem| {
+        if (elem.typ == .Board) {
+            break @intToPtr(*Board, @ptrToInt(elem.obj));
+        }
+    } else unreachable;
+
     const elapsed_time = self.cap_timer.getTicks();
     if (elapsed_time >= 1000) {
-        if ((try p.moveDown()) == false) {
+        if ((try p.moveDown(b)) == false) {
             var game_over_state = try self.allocator.create(*GameOverState);
             game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
             try self.state_machine.changeState(&game_over_state.*.*.interface);
@@ -231,7 +249,7 @@ fn renderFn(child: *StateInterfce) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     // Draw next incoming piece
-    Piece.next_piece.interface.draw(Piece.View.TetrominoViewport);
+    Piece.next_piece.?.interface.draw(Piece.View.TetrominoViewport);
 
     _ = c.SDL_RenderPresent(self.renderer);
 }

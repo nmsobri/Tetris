@@ -60,9 +60,11 @@ const tetromino_viewport: c.SDL_Rect = .{
 
 window: *c.SDL_Window = null,
 renderer: *c.SDL_Renderer = null,
+bitmap_font: BitmapFont = undefined,
 allocator: *std.mem.Allocator = undefined,
 interface: StateInterface = undefined,
 state_machine: *StateMachine = undefined,
+board: Board = undefined,
 
 pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *StateMachine) !*Self {
     var self = try allocator.create(Self);
@@ -70,10 +72,18 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
     self.* = Self{
         .window = window,
         .renderer = renderer,
+        .bitmap_font = BitmapFont.init(),
         .allocator = allocator,
         .interface = StateInterface.init(updateFn, renderFn, onEnterFn, onExitFn, inputFn, stateIDFn),
         .state_machine = state_machine,
+        .board = Board.init(renderer),
     };
+
+    var ptr_font_texture = try allocator.create(Texture);
+    ptr_font_texture.* = Texture.init(self.window, self.renderer);
+
+    try ptr_font_texture.loadFromFile("res/font.bmp");
+    try self.bitmap_font.buildFont(ptr_font_texture);
 
     return self;
 }
@@ -127,6 +137,8 @@ fn renderFn(child: *StateInterface) !void {
         .w = 300,
         .h = constant.SCREEN_HEIGHT - constant.BLOCK * 2,
     });
+    self.board.interface.draw(Piece.View.PlayViewport);
+    self.bitmap_font.renderText(0, 45, "Press Enter To Play");
 
     // Right viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.right_viewport);
@@ -138,24 +150,24 @@ fn renderFn(child: *StateInterface) !void {
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    // var txt_width = self.bitmap_font.calculateTextWidth("Level");
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level");
+    var txt_width = self.bitmap_font.calculateTextWidth("Level");
+    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level");
 
-    // var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.level});
-    // txt_width = self.bitmap_font.calculateTextWidth(level_txt);
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
+    var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{1});
+    txt_width = self.bitmap_font.calculateTextWidth(level_txt);
+    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
 
     // Score viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.score_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    // txt_width = self.bitmap_font.calculateTextWidth("Score");
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score");
+    txt_width = self.bitmap_font.calculateTextWidth("Score");
+    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score");
 
-    // var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.score});
-    // txt_width = self.bitmap_font.calculateTextWidth(score_txt);
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
+    var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{0});
+    txt_width = self.bitmap_font.calculateTextWidth(score_txt);
+    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
 
     // Tetromino viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.tetromino_viewport);
@@ -164,6 +176,7 @@ fn renderFn(child: *StateInterface) !void {
 
     // Draw next incoming piece
     // Piece.next_piece.interface.draw(Piece.View.TetrominoViewport);
+    try Piece.drawRandomPiece(self.renderer, Piece.View.TetrominoViewport);
 
     _ = c.SDL_RenderPresent(self.renderer);
 }
