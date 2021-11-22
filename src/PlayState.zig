@@ -90,14 +90,14 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
     try self.bitmap_font.buildFont(ptr_font_texture);
 
     var ptr_board = try allocator.create(Board);
-    ptr_board.* = Board.init(self.renderer); // need to do this, so Board is allocated on the Heap
+    ptr_board.* = Board.init(self.renderer); // Need to do this, so Board is allocated on the Heap
 
     var ptr_piece = try allocator.create(Piece);
-    ptr_piece.* = try Piece.randomPiece(self.renderer, &self.score); // need to do this, so Board is allocated on the Heap
+    ptr_piece.* = try Piece.randomPiece(self.renderer, &self.score); // Need to do this, so Board is allocated on the Heap
 
     self.elements = .{
-        // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // not working, cause this allocated Board on the Stack
-        // .{ .typ = .Piece, .obj = &try Piece.randomPiece(self.renderer.?, aBoard) }, // not working, cause this allocated Piece on the Stack
+        // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // Not working, cause this allocated Board on the Stack
+        // .{ .typ = .Piece, .obj = &try Piece.randomPiece(self.renderer.?, aBoard) }, // Not working, cause this allocated Piece on the Stack
         .{ .typ = .Board, .obj = ptr_board },
         .{ .typ = .Piece, .obj = ptr_piece },
     };
@@ -146,7 +146,6 @@ fn inputFn(child: *StateInterfce) !void {
                         var game_over_state = try self.allocator.create(*GameOverState);
                         game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
                         try self.state_machine.changeState(&game_over_state.*.*.interface);
-                        // std.os.exit(0);
                     }
                 },
                 c.SDLK_LEFT => piece.moveLeft(board),
@@ -172,6 +171,8 @@ fn updateFn(child: *StateInterfce) !void {
             break @intToPtr(*Board, @ptrToInt(elem.obj));
         }
     } else unreachable;
+
+    Piece.eraseLine(b);
 
     const elapsed_time = self.cap_timer.getTicks();
     if (elapsed_time >= 1000) {
@@ -206,12 +207,12 @@ fn renderFn(child: *StateInterfce) !void {
     });
 
     for (self.elements) |e| {
-        var obj_interface = switch (e.typ) {
+        var object = switch (e.typ) {
             .Board => &(@intToPtr(*Board, @ptrToInt(e.obj))).interface,
             .Piece => &(@intToPtr(*Piece, @ptrToInt(e.obj))).interface,
         };
 
-        obj_interface.draw(Piece.View.PlayViewport);
+        object.draw(Piece.View.PlayViewport);
     }
 
     // Right viewport

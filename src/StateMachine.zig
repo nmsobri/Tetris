@@ -39,6 +39,12 @@ pub fn popState(self: *Self) !void {
     }
 }
 
+pub fn input(self: Self) !void {
+    if (self.states.items.len != 0) {
+        try self.states.items[self.states.items.len - 1].input();
+    }
+}
+
 pub fn update(self: Self) !void {
     if (self.states.items.len != 0) {
         try self.states.items[self.states.items.len - 1].update();
@@ -48,11 +54,5 @@ pub fn update(self: Self) !void {
 pub fn render(self: Self) !void {
     if (self.states.items.len != 0) {
         try self.states.items[self.states.items.len - 1].render();
-    }
-}
-
-pub fn input(self: Self) !void {
-    if (self.states.items.len != 0) {
-        try self.states.items[self.states.items.len - 1].input();
     }
 }

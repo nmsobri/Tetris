@@ -44,6 +44,10 @@ pub const StateInterface = struct {
         };
     }
 
+    pub fn input(self: *Self) !void {
+        try return self.inputFn(self);
+    }
+
     pub fn update(self: *Self) !void {
         try self.updateFn(self);
     }
@@ -58,10 +62,6 @@ pub const StateInterface = struct {
 
     pub fn onExit(self: *Self) !bool {
         try return self.onExitFn(self);
-    }
-
-    pub fn input(self: *Self) !void {
-        try return self.inputFn(self);
     }
 
     pub fn stateID(self: *Self) []const u8 {

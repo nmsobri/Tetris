@@ -8,6 +8,7 @@ const DrawInterface = @import("interface.zig").DrawInterface;
 
 const Vacant = [3]u8{ 255, 255, 255 };
 pub var next_piece: ?Self = null;
+var frame_count: u8 = 0;
 pub const View = enum { PlayViewport, TetrominoViewport };
 
 const Self = @This();
@@ -49,7 +50,7 @@ fn randomNumber() !u32 {
 
 pub fn randomPiece(renderer: *c.SDL_Renderer, score: *u32) !Self {
     Self.next_piece = Self.init(renderer, 0, 0, t.Tetrominoes[try Self.randomNumber()], score);
-    return Self.init(renderer, 3, -3, t.Tetrominoes[try randomNumber()], score);
+    return Self.init(renderer, 3, -3, t.Tetrominoes[try Self.randomNumber()], score);
 }
 
 pub fn draw(inner: *DrawInterface, v: View) void {
@@ -106,7 +107,7 @@ pub fn moveDown(self: *Self, board: *Board) !bool {
     if (!self.collision(board, 0, 1, self.tetromino_layout)) {
         self.y += 1;
     } else {
-        // we lock the piece and generate a new one
+        // We lock the piece and generate a new one
         if (self.lock(board) == false) {
             return false;
         }
@@ -143,11 +144,11 @@ pub fn rotate(self: *Self, board: *Board) void {
     // Check if rotation at current position cause blocking, if yes, then kick it one block to left/right based on its x position
     if (self.collision(board, 0, 0, next_layout)) {
         if (self.x > constant.COL / 2) {
-            // it's the right wallgg
-            kick = -1; // we need to move the piece to the left
+            // It's the right wall
+            kick = -1; // We need to move the piece to the left
         } else {
-            // it's the left wall
-            kick = 1; // we need to move the piece to the right
+            // It's the left wall
+            kick = 1; // We need to move the piece to the right
         }
     }
 
@@ -164,54 +165,48 @@ pub fn lock(self: *Self, board: *Board) bool {
     while (row < self.tetromino_layout.len) : (row += 1) {
         var col: u8 = 0;
         while (col < self.tetromino_layout[0].len) : (col += 1) {
-            // we skip the vacant squares
+            // We skip the vacant squares
             if (!self.tetromino_layout[row][col]) {
                 continue;
             }
 
-            // pieces to lock on top = game over
+            // Pieces to lock on top = game over
             if (self.y + row < 0) {
-                // stop request animation frame
-                // game over
+                // Stop request animation frame
+                // Game over
                 return false;
             }
-            // we lock the piece
+            // We lock the piece
             board.board[@intCast(usize, self.y + row)][@intCast(usize, self.x + col)] = self.tetromino.color;
         }
     }
 
-    // check if there is full row, if its, remove full row
+    // Check if there is full row, if its, remove full row
     self.remove(board);
     return true;
 }
 
-pub fn remove(self: Self, board: *Board) void {
-    // remove full rows
+pub fn remove(self: *Self, board: *Board) void {
+    // Remove full rows
     var row: u8 = 0;
     while (row < constant.ROW) : (row += 1) {
         var col: u8 = 0;
-
         var is_row_full = while (col < constant.COL) : (col += 1) {
             if (board.board[row][col] == null) break false;
         } else true;
 
         if (is_row_full) {
-            // if the row is full, we move down all the rows above it
-            var top_row = row;
+            // If the row is full, we move down all the rows above it
             self.score.* += 10;
 
-            while (top_row >= 1) : (top_row -= 1) {
-                var top_col: u8 = 0;
-                while (top_col < constant.COL) : (top_col += 1) {
-                    board.board[top_row][top_col] = board.board[top_row - 1][top_col];
-                }
-            } else {
-                // this is the very first row, so there is no more row above it, so just vacant the entire row
-                var top_col: u8 = 0;
-                while (top_col < constant.COL) : (top_col += 1) {
-                    board.board[top_row][top_col] = null;
-                }
+            // Change color of rows that need to be remove
+            var _col: u8 = 0;
+            while (_col < constant.COL) : (_col += 1) {
+                board.board[@intCast(usize, row)][@intCast(usize, _col)] = .{ 100, 100, 100 };
             }
+
+            // Mark the rows as full thus for removal
+            board.full_rows[row] = true;
         }
     }
 }
@@ -222,21 +217,21 @@ pub fn collision(self: Self, board: *Board, x: i32, y: i32, tetromino: t.Tetromi
         var col: u8 = 0;
         while (col < tetromino[0].len) : (col += 1) {
 
-            // if the square is empty, we skip it
+            // If the square is empty, we skip it
             if (!tetromino[row][col]) {
                 continue;
             }
 
-            // coordinates of the tetromino after movement
+            // Coordinates of the tetromino after movement
             const new_x = self.x + col + x;
             const new_y = self.y + row + y;
 
-            // conditions, collided with the viewport
+            // Conditions, collided with the viewport
             if (new_x < 0 or new_x >= constant.COL or new_y >= constant.ROW) {
                 return true;
             }
 
-            // skip newY < 0; board[-1] will crush our game
+            // Skip newY < 0; board[-1] will crush our game
             if (new_y < 0) {
                 continue;
             }
@@ -249,4 +244,55 @@ pub fn collision(self: Self, board: *Board, x: i32, y: i32, tetromino: t.Tetromi
     }
 
     return false;
+}
+
+pub fn eraseLine(board: *Board) void {
+    Self.frame_count += 1;
+
+    if (Self.frame_count >= 10) {
+        board.animation_frame += 1;
+
+        if (board.animation_frame <= 6) {
+            std.log.info("Animation frame: {d}", .{board.animation_frame});
+
+            for (board.full_rows) |row, i| {
+                if (row) {
+                    // Animate color of rows that need to be remove
+                    var col: u8 = 0;
+                    while (col < constant.COL) : (col += 1) {
+                        if (board.animation_frame % 2 == 0) {
+                            board.board[@intCast(usize, i)][@intCast(usize, col)] = .{ 100, 100, 100 };
+                        } else {
+                            board.board[@intCast(usize, i)][@intCast(usize, col)] = .{ 150, 150, 150 };
+                        }
+                    }
+                }
+            }
+        } else {
+            // Remove row
+            for (board.full_rows) |row, i| {
+                if (row) {
+                    var top_row = i;
+                    while (top_row >= 1) : (top_row -= 1) {
+                        var col: u8 = 0;
+                        while (col < constant.COL) : (col += 1) {
+                            board.board[top_row][col] = board.board[top_row - 1][col];
+                        }
+                    } else {
+                        // this is the very first row, so there is no more row above it, so just vacant the entire row
+                        var col: u8 = 0;
+                        while (col < constant.COL) : (col += 1) {
+                            board.board[top_row][col] = null;
+                        }
+                    }
+
+                    board.full_rows[i] = false; // Mark as not full
+                }
+            }
+
+            board.animation_frame = 0;
+        }
+
+        Self.frame_count = 0;
+    }
 }

@@ -104,7 +104,7 @@ fn inputFn(child: *StateInterface) !void {
                 c.SDLK_RETURN, c.SDLK_KP_ENTER => {
                     var play_state = try self.allocator.create(*PlayState);
                     play_state.* = try PlayState.init(self.allocator, self.window, self.renderer, self.state_machine);
-                    try self.state_machine.pushState(&play_state.*.*.interface);
+                    try self.state_machine.changeState(&play_state.*.*.interface);
                 },
                 else => {},
             },
