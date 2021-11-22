@@ -9,6 +9,7 @@ const DrawInterface = @import("interface.zig").DrawInterface;
 const Vacant = [3]u8{ 255, 255, 255 };
 pub var next_piece: ?Self = null;
 var frame_count: u8 = 0;
+var some_row_full: bool = false;
 pub const View = enum { PlayViewport, TetrominoViewport };
 
 const Self = @This();
@@ -196,6 +197,7 @@ pub fn remove(self: *Self, board: *Board) void {
         } else true;
 
         if (is_row_full) {
+            Self.some_row_full = true;
             // If the row is full, we move down all the rows above it
             self.score.* += 10;
 
@@ -247,12 +249,14 @@ pub fn collision(self: Self, board: *Board, x: i32, y: i32, tetromino: t.Tetromi
 }
 
 pub fn eraseLine(board: *Board) void {
-    Self.frame_count += 1;
+    if (Self.some_row_full) {
+        Self.frame_count += 1;
+    }
 
     if (Self.frame_count >= 10) {
         board.animation_frame += 1;
 
-        if (board.animation_frame <= 6) {
+        if (board.animation_frame <= 4) {
             std.log.info("Animation frame: {d}", .{board.animation_frame});
 
             for (board.full_rows) |row, i| {
@@ -290,6 +294,7 @@ pub fn eraseLine(board: *Board) void {
                 }
             }
 
+            Self.some_row_full = false;
             board.animation_frame = 0;
         }
 
