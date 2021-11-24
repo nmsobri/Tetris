@@ -163,7 +163,9 @@ pub fn rotate(self: *Self, board: *Board) void {
 
 pub fn lock(self: *Self, board: *Board) bool {
     var row: u8 = 0;
-    while (row < self.tetromino_layout.len) : (row += 1) {
+    var should_return = false;
+
+    outer: while (row < self.tetromino_layout.len) : (row += 1) {
         var col: u8 = 0;
         while (col < self.tetromino_layout[0].len) : (col += 1) {
             // We skip the vacant squares
@@ -173,14 +175,18 @@ pub fn lock(self: *Self, board: *Board) bool {
 
             // Pieces to lock on top = game over
             if (self.y + row < 0) {
-                // Stop request animation frame
                 // Game over
-                return false;
+                // dont immediately return, it will cause row 0, always vacant,
+                // eventhough there is piece lock on that row
+                should_return = true;
+                continue :outer;
             }
             // We lock the piece
             board.board[@intCast(usize, self.y + row)][@intCast(usize, self.x + col)] = self.tetromino.color;
         }
     }
+
+    if (should_return) return false;
 
     // Check if there is full row, if its, remove full row
     self.remove(board);
@@ -257,8 +263,6 @@ pub fn eraseLine(board: *Board) void {
         board.animation_frame += 1;
 
         if (board.animation_frame <= 4) {
-            std.log.info("Animation frame: {d}", .{board.animation_frame});
-
             for (board.full_rows) |row, i| {
                 if (row) {
                     // Animate color of rows that need to be remove

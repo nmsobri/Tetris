@@ -6,7 +6,7 @@ const Timer = @import("Timer.zig");
 const Board = @import("Board.zig");
 const Piece = @import("Piece.zig");
 const BitmapFont = @import("BitmapFont.zig");
-const Texture = @import("Texture.zig");
+const Font = @import("Font.zig");
 const constant = @import("constant.zig");
 const StateInterfce = @import("interface.zig").StateInterface;
 const Statemachine = @import("StateMachine.zig");
@@ -83,11 +83,9 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
         .state_machine = state_machine,
     };
 
-    var ptr_font_texture = try allocator.create(Texture);
-    ptr_font_texture.* = Texture.init(self.window, self.renderer);
-
-    try ptr_font_texture.loadFromFile("res/font.bmp");
-    try self.bitmap_font.buildFont(ptr_font_texture);
+    var ptr_font = try allocator.create(Font);
+    ptr_font.* = try Font.init(self.renderer, "res/Cascadia.ttf", 10, .{ .r = 150, .g = 150, .b = 150, .a = 255 });
+    try self.bitmap_font.buildFont(ptr_font);
 
     var ptr_board = try allocator.create(Board);
     ptr_board.* = Board.init(self.renderer); // Need to do this, so Board is allocated on the Heap
@@ -145,7 +143,7 @@ fn inputFn(child: *StateInterfce) !void {
                     if ((try piece.moveDown(board)) == false) {
                         var game_over_state = try self.allocator.create(*GameOverState);
                         game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
-                        try self.state_machine.changeState(&game_over_state.*.*.interface);
+                        try self.state_machine.pushState(&game_over_state.*.*.interface);
                     }
                 },
                 c.SDLK_LEFT => piece.moveLeft(board),
@@ -179,7 +177,7 @@ fn updateFn(child: *StateInterfce) !void {
         if ((try p.moveDown(b)) == false) {
             var game_over_state = try self.allocator.create(*GameOverState);
             game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
-            try self.state_machine.changeState(&game_over_state.*.*.interface);
+            try self.state_machine.pushState(&game_over_state.*.*.interface);
         }
 
         self.cap_timer.startTimer();
@@ -264,7 +262,6 @@ fn onEnterFn(child: *StateInterfce) !bool {
 fn onExitFn(child: *StateInterfce) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = self;
-    std.log.info("Leaving playing state", .{});
     return true;
 }
 

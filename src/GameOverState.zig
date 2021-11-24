@@ -63,6 +63,7 @@ renderer: *c.SDL_Renderer = null,
 allocator: *std.mem.Allocator = undefined,
 interface: StateInterface = undefined,
 state_machine: *StateMachine = undefined,
+play_state: *PlayState = undefined,
 
 pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *StateMachine) !*Self {
     var self = try allocator.create(Self);
@@ -94,7 +95,9 @@ fn inputFn(child: *StateInterface) !void {
                 c.SDLK_RETURN, c.SDLK_KP_ENTER => {
                     var play_state = try self.allocator.create(*PlayState);
                     play_state.* = try PlayState.init(self.allocator, self.window, self.renderer, self.state_machine);
-                    try self.state_machine.pushState(&play_state.*.*.interface);
+                    try self.state_machine.popState(); // pop game over state
+                    try self.state_machine.popState(); // pop play state
+                    try self.state_machine.changeState(&play_state.*.*.interface);
                 },
                 else => {},
             },
@@ -128,6 +131,16 @@ fn renderFn(child: *StateInterface) !void {
         .h = constant.SCREEN_HEIGHT - constant.BLOCK * 2,
     });
 
+    var board = for (self.play_state.elements) |elem| {
+        if (elem.typ == .Board) {
+            break @intToPtr(*Board, @ptrToInt(elem.obj));
+        }
+    } else unreachable;
+
+    board.interface.draw(Piece.View.PlayViewport);
+    self.play_state.bitmap_font.renderText(45, 45, "Game Over!");
+    self.play_state.bitmap_font.renderText(45, 90, "Press Enter \nTo Restart");
+
     // Right viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.right_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0x00, 0x00, 0x00, 0xFF);
@@ -138,24 +151,24 @@ fn renderFn(child: *StateInterface) !void {
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    // var txt_width = self.bitmap_font.calculateTextWidth("Level");
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level");
+    var txt_width = self.play_state.bitmap_font.calculateTextWidth("Level");
+    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level");
 
-    // var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.level});
-    // txt_width = self.bitmap_font.calculateTextWidth(level_txt);
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
+    var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.play_state.level});
+    txt_width = self.play_state.bitmap_font.calculateTextWidth(level_txt);
+    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
 
     // Score viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.score_viewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    // txt_width = self.bitmap_font.calculateTextWidth("Score");
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score");
+    txt_width = self.play_state.bitmap_font.calculateTextWidth("Score");
+    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score");
 
-    // var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.score});
-    // txt_width = self.bitmap_font.calculateTextWidth(score_txt);
-    // self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
+    var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.play_state.score});
+    txt_width = self.play_state.bitmap_font.calculateTextWidth(score_txt);
+    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
 
     // Tetromino viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.tetromino_viewport);
@@ -163,14 +176,36 @@ fn renderFn(child: *StateInterface) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     // Draw next incoming piece
-    // Piece.next_piece.interface.draw(Piece.View.TetrominoViewport);
+    Piece.next_piece.?.interface.draw(Piece.View.TetrominoViewport);
 
     _ = c.SDL_RenderPresent(self.renderer);
 }
 
 fn onEnterFn(child: *StateInterface) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
-    _ = self;
+
+    var play_state_interface = self.state_machine.states.items[self.state_machine.states.items.len - 2];
+    var play_state = @fieldParentPtr(PlayState, "interface", play_state_interface);
+
+    var board = for (play_state.elements) |elem| {
+        if (elem.typ == .Board) {
+            break @intToPtr(*Board, @ptrToInt(elem.obj));
+        }
+    } else unreachable;
+
+    // Change the color of every tetrominoes to show obvious game over state
+    var row: usize = 0;
+    while (row < constant.ROW) : (row += 1) {
+        var col: usize = 0;
+
+        while (col < constant.COL) : (col += 1) {
+            if (board.board[row][col] != null) {
+                board.board[row][col] = .{ 150, 150, 150 };
+            }
+        }
+    }
+
+    self.play_state = play_state;
     return true;
 }
 

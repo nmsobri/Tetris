@@ -6,7 +6,7 @@ const Timer = @import("Timer.zig");
 const Board = @import("Board.zig");
 const Piece = @import("Piece.zig");
 const BitmapFont = @import("BitmapFont.zig");
-const Texture = @import("Texture.zig");
+const Font = @import("Font.zig");
 const constant = @import("constant.zig");
 const StateInterface = @import("interface.zig").StateInterface;
 const StateMachine = @import("StateMachine.zig");
@@ -79,11 +79,9 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
         .board = Board.init(renderer),
     };
 
-    var ptr_font_texture = try allocator.create(Texture);
-    ptr_font_texture.* = Texture.init(self.window, self.renderer);
-
-    try ptr_font_texture.loadFromFile("res/font.bmp");
-    try self.bitmap_font.buildFont(ptr_font_texture);
+    var ptr_font = try allocator.create(Font);
+    ptr_font.* = try Font.init(self.renderer, "res/Cascadia.ttf", 10, .{ .r = 150, .g = 150, .b = 150, .a = 255 });
+    try self.bitmap_font.buildFont(ptr_font);
 
     return self;
 }

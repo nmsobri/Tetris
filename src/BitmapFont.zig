@@ -1,11 +1,12 @@
-const Texture = @import("Texture.zig");
+const Font = @import("Font.zig");
 const c = @import("sdl.zig");
 
 const Self = @This();
-const CharPerColumn = 16;
+// const CharPerColumn = 16;
+const CharPerColumn = 94;
 const CharPerRow = 16;
 
-bitmap: ?*Texture,
+bitmap: ?*Font,
 chars: [256]c.SDL_Rect,
 new_line: u32,
 space: u32,
@@ -23,7 +24,7 @@ pub fn init() Self {
     };
 }
 
-pub fn buildFont(self: *Self, bitmap: *Texture) !void {
+pub fn buildFont(self: *Self, bitmap: *Font) !void {
     // Lock pixels for access
     try bitmap.lockTexture();
 
@@ -32,7 +33,8 @@ pub fn buildFont(self: *Self, bitmap: *Texture) !void {
 
     // Set the cell dimensions
     self.cell_width = bitmap.getWidth() / CharPerColumn;
-    self.cell_height = bitmap.getHeight() / CharPerRow;
+    // self.cell_height = bitmap.getHeight() / CharPerRow;
+    self.cell_height = bitmap.getHeight();
 
     // Vars for Calculation of new line variables
     var top: u32 = self.cell_height; // set to the bottom of the cell, so later we can iterate and find the highest point
@@ -108,7 +110,7 @@ pub fn renderText(self: *Self, x: c_int, y: c_int, text: []const u8) void {
             const ascii = text[i];
 
             // Show the character
-            self.bitmap.?.render(cur_x, cur_y, &self.chars[ascii], null, null, null, .{});
+            self.bitmap.?.render(cur_x, cur_y, &self.chars[ascii], 0, null, null, .{});
 
             // Move over the width of the character with one pixel of padding
             cur_x += self.chars[ascii].w + 1;
@@ -144,7 +146,7 @@ pub fn calculateTextWidth(self: Self, text: []const u8) u32 {
 
 fn setLeftOffset(
     self: *Self,
-    bitmap: *Texture,
+    bitmap: *Font,
     bg_color: u32,
     current_char: u32,
     cell_w: u32,
@@ -182,7 +184,7 @@ fn setLeftOffset(
 
 fn setRightOffset(
     self: *Self,
-    bitmap: *Texture,
+    bitmap: *Font,
     bg_color: u32,
     current_char: u32,
     cell_w: u32,
@@ -217,7 +219,7 @@ fn setRightOffset(
 
 fn setTopOffset(
     self: Self,
-    bitmap: *Texture,
+    bitmap: *Font,
     bg_color: u32,
     cell_w: u32,
     cell_h: u32,
@@ -255,7 +257,7 @@ fn setTopOffset(
 
 fn setBottomOffset(
     self: *Self,
-    bitmap: *Texture,
+    bitmap: *Font,
     bg_color: u32,
     current_char: u32,
     cell_w: u32,
