@@ -36,7 +36,7 @@ fn createFont(self: *Self, path: []const u8, size: u8, color: c.SDL_Color) !void
         return error.ERROR_OPEN_FONT;
     };
 
-    var text: []const u8 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-=~!@#$%^&*()_+[]\\{}|;':\",./<>?`";
+    var text: []const u8 = "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 
     // Create font surface
     const surface: *c.SDL_Surface = c.TTF_RenderText_Blended(font, text.ptr, color) orelse {

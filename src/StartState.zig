@@ -80,8 +80,8 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
     };
 
     var ptr_font = try allocator.create(Font);
-    ptr_font.* = try Font.init(self.renderer, "res/Cascadia.ttf", 10, .{ .r = 150, .g = 150, .b = 150, .a = 255 });
-    try self.bitmap_font.buildFont(ptr_font);
+    ptr_font.* = try Font.init(self.renderer, "res/Zector.ttf", 15, .{ .r = 0, .g = 0, .b = 255, .a = 255 });
+    try self.bitmap_font.buildMonoSpacedFont(ptr_font);
 
     return self;
 }

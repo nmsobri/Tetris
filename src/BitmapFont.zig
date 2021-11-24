@@ -2,9 +2,8 @@ const Font = @import("Font.zig");
 const c = @import("sdl.zig");
 
 const Self = @This();
-// const CharPerColumn = 16;
-const CharPerColumn = 94;
-const CharPerRow = 16;
+const TotalCharColumn = 127; // actually it just 94 but since printed ascii code start at 33, so 94 + 33
+const AsciiStart = 33;
 
 bitmap: ?*Font,
 chars: [256]c.SDL_Rect,
@@ -12,6 +11,8 @@ new_line: u32,
 space: u32,
 cell_width: u32,
 cell_height: u32,
+char_left_side: u64,
+char_right_side: u64,
 
 pub fn init() Self {
     return Self{
@@ -21,6 +22,8 @@ pub fn init() Self {
         .space = 0,
         .cell_width = 0,
         .cell_height = 0,
+        .char_left_side = 0,
+        .char_right_side = 0,
     };
 }
 
@@ -32,40 +35,90 @@ pub fn buildFont(self: *Self, bitmap: *Font) !void {
     var bg_color: u32 = bitmap.getPixels32(0, 0);
 
     // Set the cell dimensions
-    self.cell_width = bitmap.getWidth() / CharPerColumn;
-    // self.cell_height = bitmap.getHeight() / CharPerRow;
+    self.cell_width = bitmap.getWidth() / (TotalCharColumn - AsciiStart);
+    // self.cell_width = 12;
     self.cell_height = bitmap.getHeight();
 
     // Vars for Calculation of new line variables
     var top: u32 = self.cell_height; // set to the bottom of the cell, so later we can iterate and find the highest point
     var bottom: u32 = self.cell_height;
 
-    // The current character we're setting
-    var current_char: u32 = 0;
+    const rows: u32 = 0; // No need to go each rows since we only have one row
+    var cols: u32 = AsciiStart; // start at 33 since printed ascii code start at 33
+    var start_pixel: u64 = self.char_left_side;
 
-    // Go through the cell rows
-    var rows: u32 = 0;
-    while (rows < 16) : (rows += 1) {
+    // Go through the cell columns
+    while (start_pixel <= bitmap.getWidth()) {
+        // Set current character ( based on ascii code ) initial offset
+        self.chars[cols].x = @intCast(c_int, (cols - AsciiStart) * self.cell_width);
+        self.chars[cols].y = @intCast(c_int, rows * self.cell_height);
 
-        // Go through the cell columns
-        var cols: u32 = 0;
-        while (cols < 16) : (cols += 1) {
-            // Set current character ( based on ascii code ) initial offset
-            self.chars[current_char].x = @intCast(c_int, cols * self.cell_width);
-            self.chars[current_char].y = @intCast(c_int, rows * self.cell_height);
+        // Set the initial dimensions of the character
+        self.chars[cols].w = @intCast(c_int, self.cell_width);
+        self.chars[cols].h = @intCast(c_int, self.cell_height);
 
-            // Set the initial dimensions of the character
-            self.chars[current_char].w = @intCast(c_int, self.cell_width);
-            self.chars[current_char].h = @intCast(c_int, self.cell_height);
+        self.setLeftOffset(bitmap, bg_color, cols, self.cell_width, self.cell_height, start_pixel, rows);
+        self.setRightOffset(bitmap, bg_color, cols, self.cell_width, self.cell_height, start_pixel, rows);
+        self.setTopOffset(bitmap, bg_color, self.cell_width, self.cell_height, start_pixel, rows, &top);
+        self.setBottomOffset(bitmap, bg_color, cols, self.cell_width, self.cell_height, start_pixel, rows, &bottom);
 
-            self.setLeftOffset(bitmap, bg_color, current_char, self.cell_width, self.cell_height, cols, rows);
-            self.setRightOffset(bitmap, bg_color, current_char, self.cell_width, self.cell_height, cols, rows);
-            self.setTopOffset(bitmap, bg_color, self.cell_width, self.cell_height, cols, rows, &top);
-            self.setBottomOffset(bitmap, bg_color, current_char, self.cell_width, self.cell_height, cols, rows, &bottom);
+        // advance to next glyph
+        start_pixel += self.char_right_side + 1;
 
-            // Next character
-            current_char += 1;
-        }
+        // Next character
+        cols += 1;
+    }
+
+    // Calculate space
+    self.space = self.cell_width / 2;
+
+    // Calculate new line
+    self.new_line = bottom - top;
+
+    // Lop off excess top pixels
+    var i: usize = 0;
+    while (i < 256) : (i += 1) {
+        self.chars[i].y += @intCast(c_int, top);
+        self.chars[i].h -= @intCast(c_int, top);
+    }
+
+    try bitmap.unlockTexture();
+    self.bitmap = bitmap;
+}
+
+pub fn buildMonoSpacedFont(self: *Self, bitmap: *Font) !void {
+    // Lock pixels for access
+    try bitmap.lockTexture();
+
+    // Set the background color by getting pixel color at left top
+    var bg_color: u32 = bitmap.getPixels32(0, 0);
+
+    // Set the cell dimensions
+    self.cell_width = bitmap.getWidth() / (TotalCharColumn - AsciiStart);
+    // self.cell_width = 12;
+    self.cell_height = bitmap.getHeight();
+
+    // Vars for Calculation of new line variables
+    var top: u32 = self.cell_height; // set to the bottom of the cell, so later we can iterate and find the highest point
+    var bottom: u32 = self.cell_height;
+
+    const rows: u32 = 0; // No need to go each rows since we only have one row
+    var cols: u32 = AsciiStart; // start at 33 since printed ascii code start at 33
+
+    // Go through the cell columns
+    while (cols <= TotalCharColumn) : (cols += 1) {
+        // Set current character ( based on ascii code ) initial offset
+        self.chars[cols].x = @intCast(c_int, (cols - AsciiStart) * self.cell_width);
+        self.chars[cols].y = @intCast(c_int, rows * self.cell_height);
+
+        // Set the initial dimensions of the character
+        self.chars[cols].w = @intCast(c_int, self.cell_width);
+        self.chars[cols].h = @intCast(c_int, self.cell_height);
+
+        self.setMonospacedLeftOffset(bitmap, bg_color, cols, self.cell_width, self.cell_height, cols - AsciiStart, rows);
+        self.setMonospacedRightOffset(bitmap, bg_color, cols, self.cell_width, self.cell_height, cols - AsciiStart, rows);
+        self.setMonospacedTopOffset(bitmap, bg_color, self.cell_width, self.cell_height, cols - AsciiStart, rows, &top);
+        self.setMonospacedBottomOffset(bitmap, bg_color, cols, self.cell_width, self.cell_height, cols - AsciiStart, rows, &bottom);
     }
 
     // Calculate space
@@ -144,7 +197,7 @@ pub fn calculateTextWidth(self: Self, text: []const u8) u32 {
     return width;
 }
 
-fn setLeftOffset(
+fn setMonospacedLeftOffset(
     self: *Self,
     bitmap: *Font,
     bg_color: u32,
@@ -182,7 +235,7 @@ fn setLeftOffset(
     }
 }
 
-fn setRightOffset(
+fn setMonospacedRightOffset(
     self: *Self,
     bitmap: *Font,
     bg_color: u32,
@@ -217,7 +270,7 @@ fn setRightOffset(
     }
 }
 
-fn setTopOffset(
+fn setMonospacedTopOffset(
     self: Self,
     bitmap: *Font,
     bg_color: u32,
@@ -255,7 +308,7 @@ fn setTopOffset(
     }
 }
 
-fn setBottomOffset(
+fn setMonospacedBottomOffset(
     self: *Self,
     bitmap: *Font,
     bg_color: u32,
@@ -294,3 +347,99 @@ fn setBottomOffset(
         }
     }
 }
+
+fn setLeftOffset(
+    self: *Self,
+    bitmap: *Font,
+    bg_color: u32,
+    current_char: u32,
+    cell_w: u32,
+    cell_h: u32,
+    current_col: u32,
+    current_row: u32,
+) void {
+    // Find Left Side edges
+    // Go through every pixel of every row for each column ( start from left to the right side )
+    var cell_col: u32 = current_col;
+    main: while (cell_col < bitmap.getWidth()) : (cell_col += 1) {
+
+        // Go through pixel rows
+        var cell_row: u32 = 0;
+        while (cell_row < cell_h) : (cell_row += 1) {
+            var px: u32 = cell_col;
+            var py: u32 = cell_row;
+
+            // If a current pixel color != bg_color ( then it is font color )
+            if (bitmap.getPixels32(px, py) != bg_color) {
+                // Set the x offset
+                self.chars[current_char].x = @intCast(c_int, px);
+                self.char_left_side = px;
+                break :main;
+            }
+        }
+    }
+}
+
+fn setRightOffset(
+    self: *Self,
+    bitmap: *Font,
+    bg_color: u32,
+    current_char: u32,
+    cell_w: u32,
+    cell_h: u32,
+    current_col: u32,
+    current_row: u32,
+) void {
+    // Find Right Side
+    var cell_col: i32 = self.char_left_side + 1;
+
+    main: while (cell_col <= bitmap.getWidth()) : (cell_col += 1) {
+        // Go through pixel row by row
+        var cell_row: u32 = 0;
+
+        var found_font = while (cell_row < cell_h) : (cell_row += 1) {
+            // Get the pixel offsets
+            var px: u32 = cell_col;
+            var py: u32 = cell_row;
+
+            // If a current pixel color != bg_color ( then it is font color )
+            if (bitmap.getPixels32(px, py) != bg_color) {
+                break true;
+            }
+        } else false;
+
+        if (found_font) {
+            continue :main;
+        } else {
+            // Set the width
+            // Need to  - self.chars[current_char].x cause we want width and not position
+            // +1 cause column start at 0
+            self.chars[current_char].w = px - 1;
+            self.char_right_side = px - 1;
+            break :main;
+        }
+    }
+}
+
+fn setTopOffset(
+    self: Self,
+    bitmap: *Font,
+    bg_color: u32,
+    cell_w: u32,
+    cell_h: u32,
+    current_col: u32,
+    current_row: u32,
+    top: *u32,
+) void {}
+
+fn setBottomOffset(
+    self: *Self,
+    bitmap: *Font,
+    bg_color: u32,
+    current_char: u32,
+    cell_w: u32,
+    cell_h: u32,
+    current_col: u32,
+    current_row: u32,
+    bottom: *u32,
+) void {}

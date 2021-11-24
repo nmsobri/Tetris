@@ -84,8 +84,8 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
     };
 
     var ptr_font = try allocator.create(Font);
-    ptr_font.* = try Font.init(self.renderer, "res/Cascadia.ttf", 10, .{ .r = 150, .g = 150, .b = 150, .a = 255 });
-    try self.bitmap_font.buildFont(ptr_font);
+    ptr_font.* = try Font.init(self.renderer, "res/Zector.ttf", 21, .{ .r = 255, .g = 0, .b = 0, .a = 255 });
+    try self.bitmap_font.buildMonoSpacedFont(ptr_font);
 
     var ptr_board = try allocator.create(Board);
     ptr_board.* = Board.init(self.renderer); // Need to do this, so Board is allocated on the Heap

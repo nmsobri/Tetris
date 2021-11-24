@@ -3,7 +3,7 @@ pub const COL = 10;
 pub const BLOCK = 30;
 pub const GAME_NAME = "Tetriz";
 
-pub const SCREEN_WIDTH = BLOCK * 19;
+pub const SCREEN_WIDTH = BLOCK * 39;
 pub const SCREEN_HEIGHT = BLOCK * 22;
 
 pub const VIEWPORT_INFO_WIDTH = BLOCK * 6;
