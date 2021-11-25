@@ -11,8 +11,7 @@ new_line: u32,
 space: u32,
 cell_width: u32,
 cell_height: u32,
-char_left_side: u64,
-char_right_side: u64,
+char_column_edge: u32,
 
 pub fn init() Self {
     return Self{
@@ -22,8 +21,7 @@ pub fn init() Self {
         .space = 0,
         .cell_width = 0,
         .cell_height = 0,
-        .char_left_side = 0,
-        .char_right_side = 0,
+        .char_column_edge = 0,
     };
 }
 
@@ -45,7 +43,7 @@ pub fn buildFont(self: *Self, bitmap: *Font) !void {
 
     const rows: u32 = 0; // No need to go each rows since we only have one row
     var cols: u32 = AsciiStart; // start at 33 since printed ascii code start at 33
-    var start_pixel: u64 = self.char_left_side;
+    var start_pixel: u32 = self.char_column_edge;
 
     // Go through the cell columns
     while (start_pixel <= bitmap.getWidth()) {
@@ -63,7 +61,7 @@ pub fn buildFont(self: *Self, bitmap: *Font) !void {
         self.setBottomOffset(bitmap, bg_color, cols, self.cell_width, self.cell_height, start_pixel, rows, &bottom);
 
         // advance to next glyph
-        start_pixel += self.char_right_side + 1;
+        start_pixel += (self.char_column_edge + 1);
 
         // Next character
         cols += 1;
@@ -358,6 +356,9 @@ fn setLeftOffset(
     current_col: u32,
     current_row: u32,
 ) void {
+    _ = current_row;
+    _ = cell_w;
+
     // Find Left Side edges
     // Go through every pixel of every row for each column ( start from left to the right side )
     var cell_col: u32 = current_col;
@@ -373,7 +374,7 @@ fn setLeftOffset(
             if (bitmap.getPixels32(px, py) != bg_color) {
                 // Set the x offset
                 self.chars[current_char].x = @intCast(c_int, px);
-                self.char_left_side = px;
+                self.char_column_edge = px;
                 break :main;
             }
         }
@@ -390,20 +391,19 @@ fn setRightOffset(
     current_col: u32,
     current_row: u32,
 ) void {
+    _ = current_row;
+    _ = current_col;
+    _ = cell_w;
     // Find Right Side
-    var cell_col: i32 = self.char_left_side + 1;
+    var cell_col: u32 = self.char_column_edge + 1;
 
     main: while (cell_col <= bitmap.getWidth()) : (cell_col += 1) {
         // Go through pixel row by row
         var cell_row: u32 = 0;
 
         var found_font = while (cell_row < cell_h) : (cell_row += 1) {
-            // Get the pixel offsets
-            var px: u32 = cell_col;
-            var py: u32 = cell_row;
-
             // If a current pixel color != bg_color ( then it is font color )
-            if (bitmap.getPixels32(px, py) != bg_color) {
+            if (bitmap.getPixels32(cell_col, cell_row) != bg_color) {
                 break true;
             }
         } else false;
@@ -414,8 +414,8 @@ fn setRightOffset(
             // Set the width
             // Need to  - self.chars[current_char].x cause we want width and not position
             // +1 cause column start at 0
-            self.chars[current_char].w = px - 1;
-            self.char_right_side = px - 1;
+            self.chars[current_char].w = @intCast(c_int, cell_col - 1);
+            self.char_column_edge = cell_col - 1;
             break :main;
         }
     }
@@ -430,7 +430,34 @@ fn setTopOffset(
     current_col: u32,
     current_row: u32,
     top: *u32,
-) void {}
+) void {
+    _ = self;
+
+    // Find Top
+    // Go through pixel of current row ( go by each cols of current row )
+    var cell_row: u32 = 0;
+    main: while (cell_row < cell_h) : (cell_row += 1) {
+
+        // Go through pixel columns
+        var cell_col: u32 = 0;
+        while (cell_col < cell_w) : (cell_col += 1) {
+
+            // Get the pixel offsets
+            var px: u32 = (current_col * cell_w) + cell_col;
+            var py: u32 = (current_row * cell_h) + cell_row;
+
+            // If a current pixel color != bg_color ( then it is font color )
+            if (bitmap.getPixels32(px, py) != bg_color) {
+                // If new top is found
+                if (cell_row < top.*) {
+                    top.* = cell_row;
+                }
+
+                break :main;
+            }
+        }
+    }
+}
 
 fn setBottomOffset(
     self: *Self,
@@ -442,4 +469,32 @@ fn setBottomOffset(
     current_col: u32,
     current_row: u32,
     bottom: *u32,
-) void {}
+) void {
+    _ = self;
+
+    // Find Bottom of A
+    // Since each character might have different bottom such as 'g','j', 'y', we only about character 'A'
+    // and use it as default bottom for all chars
+    if (current_char != 'A') return;
+
+    // Go through pixel current_row
+    var cell_row: i32 = @intCast(i32, cell_h);
+    main: while (cell_row >= 0) : (cell_row -= 1) {
+
+        // Go through pixel columns
+        var cell_col: u32 = 0;
+        while (cell_col < cell_w) : (cell_col += 1) {
+
+            // Get the pixel offsets
+            var px: u32 = (current_col * cell_w) + @intCast(u32, cell_col);
+            var py: u32 = (current_row * cell_h) + @intCast(u32, cell_row);
+
+            // If a non colorkey pixel is found
+            if (bitmap.getPixels32(px, py) != bg_color) {
+                // Bottom of A is found
+                bottom.* = @intCast(u32, cell_row);
+                break :main;
+            }
+        }
+    }
+}
