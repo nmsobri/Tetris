@@ -77,7 +77,7 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
         .allocator = allocator,
         .interface = StateInterfce.init(updateFn, renderFn, onEnterFn, onExitFn, inputFn, stateIDFn),
         .state_machine = state_machine,
-        .font = try Font.init(renderer, "res/Zector.ttf", 20, .{ .r = 255, .g = 255, .b = 255, .a = 255 }),
+        .font = try Font.init(renderer, "res/Zector.ttf", 50, .{ .r = 255, .g = 255, .b = 255, .a = 255 }),
     };
 
     return self;
@@ -143,12 +143,12 @@ fn renderFn(child: *StateInterfce) !void {
 
     self.frame_count += 1;
     if (self.frame_count <= 25) {
-        self.play_state.bitmap_font.renderText(45, 45, "Pause!");
+        try self.play_state.bitmap_font.renderText(45, 45, "Pause!", 255, 0, 0);
     } else if (self.frame_count >= 50) {
         self.frame_count = 0;
     }
 
-    self.play_state.bitmap_font.renderText(45, 105, "Pause!");
+    try self.play_state.bitmap_font.renderText(45, 105, "Pause!", 255, 0, 0);
     self.font.render(0, 200, null, 0, null, null, .{});
 
     // Right viewport

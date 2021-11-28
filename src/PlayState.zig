@@ -77,15 +77,11 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
         .allocator = allocator,
         .window = window,
         .renderer = renderer,
-        .bitmap_font = BitmapFont.init(),
+        .bitmap_font = try BitmapFont.init(renderer, "res/Futura.ttf", 25),
         .cap_timer = Timer.init(),
         .interface = StateInterfce.init(updateFn, renderFn, onEnterFn, onExitFn, inputFn, stateIDFn),
         .state_machine = state_machine,
     };
-
-    var ptr_font = try allocator.create(Font);
-    ptr_font.* = try Font.init(self.renderer, "res/Zector.ttf", 21, .{ .r = 255, .g = 0, .b = 0, .a = 255 });
-    try self.bitmap_font.buildMonoSpacedFont(ptr_font);
 
     var ptr_board = try allocator.create(Board);
     ptr_board.* = Board.init(self.renderer); // Need to do this, so Board is allocated on the Heap
@@ -224,11 +220,11 @@ fn renderFn(child: *StateInterfce) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     var txt_width = self.bitmap_font.calculateTextWidth("Level");
-    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level");
+    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level", 255, 0, 0);
 
     var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.level});
     txt_width = self.bitmap_font.calculateTextWidth(level_txt);
-    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
+    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt, 255, 0, 0);
 
     // Score viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.score_viewport);
@@ -236,11 +232,11 @@ fn renderFn(child: *StateInterfce) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     txt_width = self.bitmap_font.calculateTextWidth("Score");
-    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score");
+    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score", 255, 0, 0);
 
     var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.score});
     txt_width = self.bitmap_font.calculateTextWidth(score_txt);
-    self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
+    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt, 255, 0, 0);
 
     // Tetromino viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.tetromino_viewport);

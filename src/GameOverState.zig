@@ -138,8 +138,8 @@ fn renderFn(child: *StateInterface) !void {
     } else unreachable;
 
     board.interface.draw(Piece.View.PlayViewport);
-    self.play_state.bitmap_font.renderText(45, 45, "Game Over!");
-    self.play_state.bitmap_font.renderText(45, 90, "Press Enter \nTo Restart");
+    try self.play_state.bitmap_font.renderText(45, 45, "Game Over!", 255, 0, 0);
+    try self.play_state.bitmap_font.renderText(45, 90, "Press Enter \nTo Restart", 255, 0, 0);
 
     // Right viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.right_viewport);
@@ -152,11 +152,11 @@ fn renderFn(child: *StateInterface) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     var txt_width = self.play_state.bitmap_font.calculateTextWidth("Level");
-    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level");
+    try self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level", 255, 0, 0);
 
     var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.play_state.level});
     txt_width = self.play_state.bitmap_font.calculateTextWidth(level_txt);
-    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt);
+    try self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt, 255, 0, 0);
 
     // Score viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.score_viewport);
@@ -164,11 +164,11 @@ fn renderFn(child: *StateInterface) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     txt_width = self.play_state.bitmap_font.calculateTextWidth("Score");
-    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score");
+    try self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score", 255, 0, 0);
 
     var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.play_state.score});
     txt_width = self.play_state.bitmap_font.calculateTextWidth(score_txt);
-    self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt);
+    try self.play_state.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt, 255, 0, 0);
 
     // Tetromino viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &Self.tetromino_viewport);
