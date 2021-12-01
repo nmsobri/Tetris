@@ -17,48 +17,6 @@ const Entity = enum { Board, Piece };
 const Element = struct { typ: Entity, obj: *const c_void };
 const Self = @This();
 
-const left_viewport: c.SDL_Rect = .{
-    .x = 0,
-    .y = 0,
-    .w = constant.BLOCK * 12,
-    .h = constant.SCREEN_HEIGHT,
-};
-
-const play_viewport: c.SDL_Rect = .{
-    .x = constant.BLOCK,
-    .y = constant.BLOCK,
-    .w = constant.BLOCK * 10,
-    .h = constant.BLOCK * constant.ROW,
-};
-
-const right_viewport: c.SDL_Rect = .{
-    .x = constant.BLOCK * 12,
-    .y = 0,
-    .w = constant.BLOCK * 7,
-    .h = constant.SCREEN_HEIGHT,
-};
-
-const level_viewport: c.SDL_Rect = .{
-    .x = constant.BLOCK * 12,
-    .y = constant.BLOCK,
-    .w = constant.VIEWPORT_INFO_WIDTH,
-    .h = constant.VIEWPORT_INFO_HEIGHT,
-};
-
-const score_viewport: c.SDL_Rect = .{
-    .x = constant.BLOCK * 12,
-    .y = constant.BLOCK * 8,
-    .w = constant.VIEWPORT_INFO_WIDTH,
-    .h = constant.VIEWPORT_INFO_HEIGHT,
-};
-
-const tetromino_viewport: c.SDL_Rect = .{
-    .x = constant.BLOCK * 12,
-    .y = constant.BLOCK * 15,
-    .w = constant.VIEWPORT_INFO_WIDTH,
-    .h = constant.VIEWPORT_INFO_HEIGHT,
-};
-
 level: u8 = 1,
 score: u32 = 0,
 cap_timer: Timer = undefined,
@@ -66,7 +24,7 @@ window: *c.SDL_Window = null,
 elements: [2]Element = undefined,
 renderer: *c.SDL_Renderer = null,
 allocator: *std.mem.Allocator = undefined,
-bitmap_font: BitmapFont = undefined,
+info_font: BitmapFont = undefined,
 interface: StateInterfce = undefined,
 state_machine: *Statemachine = undefined,
 
@@ -77,7 +35,7 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
         .allocator = allocator,
         .window = window,
         .renderer = renderer,
-        .bitmap_font = try BitmapFont.init(renderer, "res/Futura.ttf", 25),
+        .info_font = try BitmapFont.init(renderer, "res/Futura.ttf", 25),
         .cap_timer = Timer.init(),
         .interface = StateInterfce.init(updateFn, renderFn, onEnterFn, onExitFn, inputFn, stateIDFn),
         .state_machine = state_machine,
@@ -186,12 +144,12 @@ fn renderFn(child: *StateInterfce) !void {
     _ = c.SDL_RenderClear(self.renderer);
 
     // Left viewport
-    _ = c.SDL_RenderSetViewport(self.renderer, &Self.left_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.LeftViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0x00, 0x00, 0x00, 0x00);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = 360, .h = constant.SCREEN_HEIGHT });
 
     // Play viewport
-    _ = c.SDL_RenderSetViewport(self.renderer, &Self.play_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.PlayViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0x00, 0xFF, 0x00, 0xFF);
     _ = c.SDL_RenderDrawRect(self.renderer, &.{
         .x = 0,
@@ -210,36 +168,36 @@ fn renderFn(child: *StateInterfce) !void {
     }
 
     // Right viewport
-    _ = c.SDL_RenderSetViewport(self.renderer, &Self.right_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.RightViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0x00, 0x00, 0x00, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     // Level viewport
-    _ = c.SDL_RenderSetViewport(self.renderer, &Self.level_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.LevelViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    var txt_width = self.bitmap_font.calculateTextWidth("Level");
-    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Level", 255, 0, 0);
+    var txt_width = self.info_font.calculateTextWidth("Level");
+    try self.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 55, "Level", 255, 0, 0);
 
     var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.level});
-    txt_width = self.bitmap_font.calculateTextWidth(level_txt);
-    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, level_txt, 255, 0, 0);
+    txt_width = self.info_font.calculateTextWidth(level_txt);
+    try self.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 95, level_txt, 255, 0, 0);
 
     // Score viewport
-    _ = c.SDL_RenderSetViewport(self.renderer, &Self.score_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.ScoreViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    txt_width = self.bitmap_font.calculateTextWidth("Score");
-    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 45, "Score", 255, 0, 0);
+    txt_width = self.info_font.calculateTextWidth("Score");
+    try self.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 55, "Score", 255, 0, 0);
 
     var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.score});
-    txt_width = self.bitmap_font.calculateTextWidth(score_txt);
-    try self.bitmap_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 80, score_txt, 255, 0, 0);
+    txt_width = self.info_font.calculateTextWidth(score_txt);
+    try self.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 95, score_txt, 255, 0, 0);
 
     // Tetromino viewport
-    _ = c.SDL_RenderSetViewport(self.renderer, &Self.tetromino_viewport);
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.TetrominoViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 

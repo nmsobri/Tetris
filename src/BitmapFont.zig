@@ -4,7 +4,6 @@ const std = @import("std");
 
 const Self = @This();
 const NUM_GLYPHS = 127;
-const FONT_TEXTURE_SIZE = 1000;
 
 font: *c.TTF_Font = undefined,
 texture: ?*c.SDL_Texture = null,
@@ -27,16 +26,47 @@ pub fn initFont(self: *Self, path: []const u8, size: u8) !void {
     @memset(@ptrCast([*]align(4) u8, &self.glyphs), 0, (@sizeOf(c.SDL_Rect) * NUM_GLYPHS));
 
     self.font = c.TTF_OpenFont(path.ptr, size) orelse {
-        std.log.err("Failed to load font! SDL_ttf Error: {s}\n", .{c.TTF_GetError()});
-        return error.ERROR_OPEN_FONT;
+        std.log.err("Failed to load font! Sdl_ttf Error: {s}\n", .{c.TTF_GetError()});
+        return error.error_open_font;
     };
+
+    var width: c_int = 0;
+    var height: c_int = 0;
+
+    if (c.TTF_SizeText(
+        self.font,
+        "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
+        &width,
+        &height,
+    ) != 0) {
+        std.log.err("Failed to calculate font surface area! Sdl_ttf Error: {s}\n", .{c.TTF_GetError()});
+        return error.error_open_font;
+    }
 
     var surface: *c.SDL_Surface = undefined;
 
     if (c.SDL_BYTEORDER == c.SDL_BIG_ENDIAN) {
-        surface = c.SDL_CreateRGBSurface(0, FONT_TEXTURE_SIZE, FONT_TEXTURE_SIZE, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF);
+        surface = c.SDL_CreateRGBSurface(
+            0,
+            width,
+            height,
+            32,
+            0xFF000000,
+            0x00FF0000,
+            0x0000FF00,
+            0x000000FF,
+        );
     } else {
-        surface = c.SDL_CreateRGBSurface(0, FONT_TEXTURE_SIZE, FONT_TEXTURE_SIZE, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
+        surface = c.SDL_CreateRGBSurface(
+            0,
+            width,
+            height,
+            32,
+            0x000000FF,
+            0x0000FF00,
+            0x00FF0000,
+            0xFF000000,
+        );
     }
 
     defer c.SDL_FreeSurface(surface);
@@ -56,17 +86,7 @@ pub fn initFont(self: *Self, path: []const u8, size: u8) !void {
 
         if (c.TTF_SizeText(self.font, &ch, &dest.w, &dest.h) != 0) {
             std.log.err("Failed to get font text size! SDL_ttf Error: {s}\n", .{c.TTF_GetError()});
-            return error.ERROR_SET_COLOR_KEY;
-        }
-
-        if (dest.x + dest.w >= FONT_TEXTURE_SIZE) {
-            dest.x = 0;
-            dest.y += dest.h + 1;
-
-            if (dest.y + dest.h >= FONT_TEXTURE_SIZE) {
-                std.log.err("Out of glyph space in {d}x{d} font atlas texture map.\n", .{ FONT_TEXTURE_SIZE, FONT_TEXTURE_SIZE });
-                std.os.exit(1);
-            }
+            return error.ERROR_GET_FONT_SIZE;
         }
 
         if (c.SDL_BlitSurface(text, null, surface, &dest) != 0) {
@@ -85,8 +105,8 @@ pub fn renderText(self: *Self, _x: c_int, _y: c_int, text: []const u8, r: u8, g:
     // If the font has not been built
     if (self.texture == null) return;
 
-    var x = _x;
-    var y = _y;
+    var x: u32 = @intCast(u32, _x);
+    var y: u32 = @intCast(u32, _y);
 
     if (c.SDL_SetTextureColorMod(self.texture.?, r, g, b) != 0) {
         std.log.err("Failed to set texture font color! SDL Error: {s}\n", .{c.SDL_GetError()});
@@ -95,17 +115,22 @@ pub fn renderText(self: *Self, _x: c_int, _y: c_int, text: []const u8, r: u8, g:
 
     var i: u8 = 0;
     while (i < text.len) : (i += 1) {
+        if (text[i] == '\n') {
+            x = @intCast(u32, _x);
+            y += self.getGlyphHeight();
+            continue;
+        }
+
         const ascii = text[i];
         const glyph = &self.glyphs[ascii];
-
-        const dest: c.SDL_Rect = .{ .x = x, .y = y, .w = glyph.w, .h = glyph.h };
+        const dest: c.SDL_Rect = .{ .x = @intCast(c_int, x), .y = @intCast(c_int, y), .w = glyph.w, .h = glyph.h };
 
         if (c.SDL_RenderCopy(self.renderer, self.texture, glyph, &dest) != 0) {
             std.log.err("Failed to render texture! SDL Error: {s}\n", .{c.SDL_GetError()});
             return error.ERROR_RENDER_TEXTURE;
         }
 
-        x += glyph.w;
+        x += @intCast(u32, glyph.w);
     }
 }
 
@@ -121,4 +146,13 @@ pub fn calculateTextWidth(self: Self, text: []const u8) u32 {
     }
 
     return width;
+}
+
+pub fn getGlyphs(self: Self) [NUM_GLYPHS]c.SDL_Rect {
+    return self.glyphs;
+}
+
+pub fn getGlyphHeight(self: Self) u32 {
+    // Use `A` glyph height as out baseline for all of the glyph
+    return @intCast(u32, self.glyphs[65].h);
 }
