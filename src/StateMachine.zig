@@ -12,6 +12,14 @@ pub fn init(allocator: *std.mem.Allocator) Self {
 }
 
 pub fn pushState(self: *Self, state: *StateInterfce) !void {
+    if (self.states.items.len != 0) {
+        if (std.mem.eql(u8, self.states.items[self.states.items.len - 1].stateID(), state.stateID())) {
+            return;
+        }
+
+        _ = try self.states.items[self.states.items.len - 1].onExit();
+    }
+
     try self.states.append(state);
     _ = try self.states.items[self.states.items.len - 1].onEnter();
 }
@@ -36,6 +44,10 @@ pub fn popState(self: *Self) !void {
         if (try self.states.items[self.states.items.len - 1].onExit()) {
             _ = self.states.pop();
         }
+    }
+
+    if (self.states.items.len != 0) {
+        _ = try self.states.items[self.states.items.len - 1].onEnter();
     }
 }
 

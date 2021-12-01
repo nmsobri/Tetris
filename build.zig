@@ -26,11 +26,17 @@ pub fn build(b: *std.build.Builder) void {
         exe.addIncludeDir("./vendor/SDL2_Ttf/include");
         exe.addLibPath("./vendor/SDL2_Ttf/lib/x64");
 
+        // SDL2_Mixer
+        exe.addIncludeDir("./vendor/SDL2_Mixer/include");
+        exe.addLibPath("./vendor/SDL2_Mixer/lib/x64");
+
         // Copy dll to output dir for runtime
         b.installBinFile("./vendor/SDL2/lib/x64/SDL2.dll", "SDL2.dll");
         b.installBinFile("./vendor/SDL2_Image/lib/x64/SDL2_image.dll", "SDL2_image.dll");
         b.installBinFile("./vendor/SDL2_Ttf/lib/x64/SDL2_ttf.dll", "SDL2_ttf.dll");
         b.installBinFile("./vendor/SDL2_Ttf/lib/x64/libfreetype-6.dll", "libfreetype-6.dll");
+        b.installBinFile("./vendor/SDL2_Mixer/lib/x64/SDL2_mixer.dll", "SDL2_mixer.dll");
+        b.installBinFile("./vendor/SDL2_Mixer/lib/x64/libmpg123-0.dll", "libmpg123-0.dll");
     }
 
     // Link system lib
@@ -38,6 +44,7 @@ pub fn build(b: *std.build.Builder) void {
     exe.linkSystemLibrary("SDL2");
     exe.linkSystemLibrary("SDL2_image");
     exe.linkSystemLibrary("SDL2_ttf");
+    exe.linkSystemLibrary("SDL2_mixer");
 
     const run_cmd = exe.run();
     run_cmd.step.dependOn(b.getInstallStep());

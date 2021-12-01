@@ -86,12 +86,14 @@ pub fn drawRandomPiece(renderer: *c.SDL_Renderer, view: Self.View) !void {
     Self.next_piece.?.interface.draw(view);
 }
 
-pub fn hardDrop(self: *Self, board: *Board) !bool {
+pub fn hardDrop(self: *Self, board: *Board, drop: *c.Mix_Chunk, clear: *c.Mix_Chunk) !bool {
     while (self.collision(board, 0, 1, self.tetromino_layout) == false) {
         self.y += 1;
     }
 
-    if (self.lock(board) == false) {
+    _ = c.Mix_PlayChannel(-1, drop, 0);
+
+    if (self.lock(board, clear) == false) {
         return false;
     }
 
@@ -104,12 +106,26 @@ pub fn hardDrop(self: *Self, board: *Board) !bool {
     return true;
 }
 
-pub fn moveDown(self: *Self, board: *Board) !bool {
+pub fn moveDown(self: *Self, board: *Board, drop: *c.Mix_Chunk, clear: *c.Mix_Chunk) !bool {
+    var is_next_collide = false;
+
+    if (self.collision(board, 0, 2, self.tetromino_layout)) {
+        is_next_collide = true;
+    }
+
     if (!self.collision(board, 0, 1, self.tetromino_layout)) {
         self.y += 1;
-    } else {
+        if (is_next_collide) {
+            // Play sound effect
+            _ = c.Mix_PlayChannel(-1, drop, 0);
+            // _ = c.Mix_PlayChannel(-1, clear, 0);
+        }
+    }
+
+    if (is_next_collide) {
+
         // We lock the piece and generate a new one
-        if (self.lock(board) == false) {
+        if (self.lock(board, clear) == false) {
             return false;
         }
 
@@ -161,7 +177,7 @@ pub fn rotate(self: *Self, board: *Board) void {
     }
 }
 
-pub fn lock(self: *Self, board: *Board) bool {
+pub fn lock(self: *Self, board: *Board, clear: *c.Mix_Chunk) bool {
     var row: u8 = 0;
     var should_return = false;
 
@@ -181,6 +197,7 @@ pub fn lock(self: *Self, board: *Board) bool {
                 should_return = true;
                 continue :outer;
             }
+
             // We lock the piece
             board.board[@intCast(usize, self.y + row)][@intCast(usize, self.x + col)] = self.tetromino.color;
         }
@@ -189,11 +206,12 @@ pub fn lock(self: *Self, board: *Board) bool {
     if (should_return) return false;
 
     // Check if there is full row, if its, remove full row
-    self.remove(board);
+    self.remove(board, clear);
     return true;
 }
 
-pub fn remove(self: *Self, board: *Board) void {
+pub fn remove(self: *Self, board: *Board, clear: *c.Mix_Chunk) void {
+    _ = clear;
     // Remove full rows
     var row: u8 = 0;
     while (row < constant.ROW) : (row += 1) {
@@ -203,6 +221,7 @@ pub fn remove(self: *Self, board: *Board) void {
         } else true;
 
         if (is_row_full) {
+            _ = c.Mix_PlayChannel(-1, clear, 0);
             Self.some_row_full = true;
             // If the row is full, we move down all the rows above it
             self.score.* += 10;
@@ -217,6 +236,36 @@ pub fn remove(self: *Self, board: *Board) void {
             board.full_rows[row] = true;
         }
     }
+}
+
+pub fn isAnyRowFull(self: Self, board: *Board, x: i32, y: i32, tetromino: t.TetrominoLayout) bool {
+    var row: u8 = 0;
+    while (row < tetromino.len) : (row += 1) {
+        var col: u8 = 0;
+        while (col < tetromino[0].len) : (col += 1) {
+
+            // If the square is empty, we skip it
+            if (!tetromino[row][col]) {
+                continue;
+            }
+
+            // Coordinates of the tetromino after movement
+            const new_x = self.x + col + x;
+            const new_y = self.y + row + y;
+
+            // Skip newY < 0; board[-1] will crush our game
+            if (new_y < 0) {
+                continue;
+            }
+
+            // check if there is a locked tetromino alrady in place
+            if (board.board[@intCast(usize, new_y)][@intCast(usize, new_x)] != null) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 pub fn collision(self: Self, board: *Board, x: i32, y: i32, tetromino: t.TetrominoLayout) bool {

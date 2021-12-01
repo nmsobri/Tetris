@@ -25,6 +25,7 @@ allocator: *std.mem.Allocator = undefined,
 interface: StateInterface = undefined,
 state_machine: *StateMachine = undefined,
 board: Board = undefined,
+bg_music: *c.Mix_Music = undefined,
 
 pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *StateMachine) !*Self {
     var self = try allocator.create(Self);
@@ -39,6 +40,11 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
         .interface = StateInterface.init(updateFn, renderFn, onEnterFn, onExitFn, inputFn, stateIDFn),
         .state_machine = state_machine,
         .board = Board.init(renderer),
+    };
+
+    self.bg_music = c.Mix_LoadMUS("res/intro.mp3") orelse {
+        std.log.err("Failed to load background music! SDL_mixer Error: {s}\n", .{c.Mix_GetError()});
+        return error.ERROR_LOAD_WAV;
     };
 
     return self;
@@ -146,12 +152,13 @@ fn renderFn(child: *StateInterface) !void {
 
 fn onEnterFn(child: *StateInterface) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
-    _ = self;
+    _ = c.Mix_PlayMusic(self.bg_music, -1);
     return true;
 }
 
 fn onExitFn(child: *StateInterface) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
+    _ = c.Mix_HaltMusic();
     _ = self;
     return true;
 }

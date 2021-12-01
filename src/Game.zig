@@ -15,9 +15,15 @@ allocator: *std.mem.Allocator = undefined,
 state_machine: *StateMachine = undefined,
 
 pub fn init(allocator: *std.mem.Allocator) !Self {
-    if (c.SDL_Init(c.SDL_INIT_VIDEO) < 0) {
+    if (c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_AUDIO) < 0) {
         err("Couldn't initialize SDL: {s}", .{c.SDL_GetError()});
         return error.ERROR_INIT_SDL;
+    }
+
+    // Initialize SDL_mixer
+    if (c.Mix_OpenAudio(44100, c.MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        std.log.err("SDL_mixer could not initialize! SDL_mixer Error: {s}\n", .{c.Mix_GetError()});
+        return error.ERROR_INIT_MIXER;
     }
 
     var self = Self{
@@ -70,4 +76,8 @@ pub fn loop(self: *Self) !void {
 pub fn close(self: Self) void {
     c.SDL_DestroyWindow(self.window.?);
     c.SDL_DestroyRenderer(self.renderer.?);
+
+    c.Mix_Quit();
+    c.IMG_Quit();
+    c.SDL_Quit();
 }

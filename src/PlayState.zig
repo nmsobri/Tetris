@@ -27,6 +27,9 @@ allocator: *std.mem.Allocator = undefined,
 info_font: BitmapFont = undefined,
 interface: StateInterfce = undefined,
 state_machine: *Statemachine = undefined,
+drop_sound: *c.Mix_Chunk = undefined,
+clear_sound: *c.Mix_Chunk = undefined,
+bg_music: *c.Mix_Music = undefined,
 
 pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *Statemachine) !*Self {
     var self = try allocator.create(Self);
@@ -46,6 +49,21 @@ pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.S
 
     var ptr_piece = try allocator.create(Piece);
     ptr_piece.* = try Piece.randomPiece(self.renderer, &self.score); // Need to do this, so Board is allocated on the Heap
+
+    self.drop_sound = c.Mix_LoadWAV("res/drop.wav") orelse {
+        std.log.err("Failed to load drop sound effect! SDL_mixer Error: {s}\n", .{c.Mix_GetError()});
+        return error.ERROR_LOAD_WAV;
+    };
+
+    self.clear_sound = c.Mix_LoadWAV("res/clear.wav") orelse {
+        std.log.err("Failed to load clear sound effect! SDL_mixer Error: {s}\n", .{c.Mix_GetError()});
+        return error.ERROR_LOAD_WAV;
+    };
+
+    self.bg_music = c.Mix_LoadMUS("res/play.mp3") orelse {
+        std.log.err("Failed to load background music! SDL_mixer Error: {s}\n", .{c.Mix_GetError()});
+        return error.ERROR_LOAD_WAV;
+    };
 
     self.elements = .{
         // .{ .typ = .Board, .obj = &Board.init(self.renderer.?) }, // Not working, cause this allocated Board on the Stack
@@ -86,7 +104,7 @@ fn inputFn(child: *StateInterfce) !void {
                     try self.state_machine.pushState(&pause_state.*.*.interface);
                 },
                 c.SDLK_SPACE => {
-                    _ = try piece.hardDrop(board);
+                    _ = try piece.hardDrop(board, self.drop_sound, self.clear_sound);
                 },
                 c.SDLK_UP => {
                     if (evt.key.repeat == 0) {
@@ -94,7 +112,7 @@ fn inputFn(child: *StateInterfce) !void {
                     }
                 },
                 c.SDLK_DOWN => {
-                    if ((try piece.moveDown(board)) == false) {
+                    if ((try piece.moveDown(board, self.drop_sound, self.clear_sound)) == false) {
                         var game_over_state = try self.allocator.create(*GameOverState);
                         game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
                         try self.state_machine.pushState(&game_over_state.*.*.interface);
@@ -124,11 +142,9 @@ fn updateFn(child: *StateInterfce) !void {
         }
     } else unreachable;
 
-    Piece.eraseLine(b);
-
     const elapsed_time = self.cap_timer.getTicks();
     if (elapsed_time >= 1000) {
-        if ((try p.moveDown(b)) == false) {
+        if ((try p.moveDown(b, self.drop_sound, self.clear_sound)) == false) {
             var game_over_state = try self.allocator.create(*GameOverState);
             game_over_state.* = try GameOverState.init(self.allocator, self.window, self.renderer, self.state_machine);
             try self.state_machine.pushState(&game_over_state.*.*.interface);
@@ -136,6 +152,8 @@ fn updateFn(child: *StateInterfce) !void {
 
         self.cap_timer.startTimer();
     }
+
+    Piece.eraseLine(b);
 }
 
 fn renderFn(child: *StateInterfce) !void {
@@ -210,12 +228,31 @@ fn renderFn(child: *StateInterfce) !void {
 fn onEnterFn(child: *StateInterfce) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
     self.cap_timer.startTimer();
+
+    if (c.Mix_PlayingMusic() == 0) {
+        // Play the music
+        _ = c.Mix_PlayMusic(self.bg_music, -1);
+    }
+    // If music is being played
+    else {
+        // If the music is paused
+        if (c.Mix_PausedMusic() == 1) {
+            // Resume the music
+            c.Mix_ResumeMusic();
+        }
+    }
+
     return true;
 }
 
 fn onExitFn(child: *StateInterfce) !bool {
     var self = @fieldParentPtr(Self, "interface", child);
     _ = self;
+
+    if (c.Mix_PlayingMusic() != 0) {
+        c.Mix_PauseMusic();
+    }
+
     return true;
 }
 
@@ -228,4 +265,7 @@ fn stateIDFn(child: *StateInterfce) []const u8 {
 pub fn close(self: Self) void {
     c.SDL_DestroyWindow(self.window);
     c.SDL_DestroyRenderer(self.renderer);
+
+    c.Mix_FreeChunk(self.drop_sound);
+    c.Mix_FreeChunk(self.clear_sound);
 }
