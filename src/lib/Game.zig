@@ -1,11 +1,11 @@
 const std = @import("std");
 const err = std.log.err;
-const c = @import("sdl.zig");
+const c = @import("../sdl.zig");
 
 const Timer = @import("Timer.zig");
-const constant = @import("constant.zig");
+const constant = @import("../constant.zig");
 const StateMachine = @import("StateMachine.zig");
-const StartState = @import("StartState.zig");
+const StartState = @import("../state/StartState.zig");
 const Self = @This();
 
 fps_timer: Timer = undefined,

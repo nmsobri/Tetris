@@ -1,5 +1,5 @@
 const Font = @import("Font.zig");
-const c = @import("sdl.zig");
+const c = @import("../sdl.zig");
 const std = @import("std");
 
 const Self = @This();

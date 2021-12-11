@@ -1,16 +1,16 @@
 const std = @import("std");
 const err = std.log.err;
-const c = @import("sdl.zig");
+const c = @import("../sdl.zig");
 
-const Font = @import("Font.zig");
-const Timer = @import("Timer.zig");
-const Board = @import("Board.zig");
-const Piece = @import("Piece.zig");
-const BitmapFont = @import("BitmapFont.zig");
-const Texture = @import("Texture.zig");
-const constant = @import("constant.zig");
-const StateInterfce = @import("interface.zig").StateInterface;
-const StateMachine = @import("StateMachine.zig");
+const Font = @import("../lib/Font.zig");
+const Timer = @import("../lib/Timer.zig");
+const Board = @import("../Board.zig");
+const Piece = @import("../Piece.zig");
+const BitmapFont = @import("../lib/BitmapFont.zig");
+const Texture = @import("../lib/Texture.zig");
+const constant = @import("../constant.zig");
+const StateInterfce = @import("../interface.zig").StateInterface;
+const StateMachine = @import("../lib/StateMachine.zig");
 const PlayState = @import("PlayState.zig");
 
 const Entity = enum { Board, Piece };
@@ -99,10 +99,10 @@ fn renderFn(child: *StateInterfce) !void {
 
     self.frame_count += 1;
     if (self.frame_count <= 25) {
-        const txt_width = self.play_state.info_font.calculateTextWidth("Pause!");
+        const txt_width = self.play_state.font_info.calculateTextWidth("Pause!");
         const xpos = @intCast(c_int, ((constant.BLOCK * 10) - txt_width) / 2);
-        const ypos = (constant.BLOCK * 20 / 2) - @intCast(c_int, self.play_state.info_font.getGlyphHeight());
-        try self.play_state.info_font.renderText(xpos, ypos, "Pause!", 0, 0, 255);
+        const ypos = (constant.BLOCK * 20 / 2) - @intCast(c_int, self.play_state.font_info.getGlyphHeight());
+        try self.play_state.font_info.renderText(xpos, ypos, "Pause!", 0, 0, 255);
     } else if (self.frame_count >= 50) {
         self.frame_count = 0;
     }
@@ -117,24 +117,36 @@ fn renderFn(child: *StateInterfce) !void {
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    var txt_width = self.play_state.info_font.calculateTextWidth("Level");
-    try self.play_state.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 55, "Level", 255, 0, 0);
+    var txt_width = self.play_state.font_info.calculateTextWidth("Level");
+    try self.play_state.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 35, "Level", 255, 0, 0);
 
     var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.play_state.level});
-    txt_width = self.play_state.info_font.calculateTextWidth(level_txt);
-    try self.play_state.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 95, level_txt, 255, 0, 0);
+    txt_width = self.play_state.font_info.calculateTextWidth(level_txt);
+    try self.play_state.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 75, level_txt, 255, 0, 0);
 
     // Score viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &constant.ScoreViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
-    txt_width = self.play_state.info_font.calculateTextWidth("Score");
-    try self.play_state.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 55, "Score", 255, 0, 0);
+    txt_width = self.play_state.font_info.calculateTextWidth("Score");
+    try self.play_state.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 35, "Score", 255, 0, 0);
 
     var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.play_state.score});
-    txt_width = self.play_state.info_font.calculateTextWidth(score_txt);
-    try self.play_state.info_font.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 95, score_txt, 255, 0, 0);
+    txt_width = self.play_state.font_info.calculateTextWidth(score_txt);
+    try self.play_state.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 75, score_txt, 255, 0, 0);
+
+    // Line viewport
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.LineViewport);
+    _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+    _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
+
+    txt_width = self.play_state.font_info.calculateTextWidth("Line");
+    try self.play_state.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 35, "Line", 255, 0, 0);
+
+    var line_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{self.play_state.line});
+    txt_width = self.play_state.font_info.calculateTextWidth(line_txt);
+    try self.play_state.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 75, line_txt, 255, 0, 0);
 
     // Tetromino viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &constant.TetrominoViewport);

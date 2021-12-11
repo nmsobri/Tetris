@@ -9,7 +9,7 @@ pub const SCREEN_WIDTH = BLOCK * 18;
 pub const SCREEN_HEIGHT = BLOCK * 22;
 
 pub const VIEWPORT_INFO_WIDTH = BLOCK * 5;
-pub const VIEWPORT_INFO_HEIGHT = BLOCK * 6;
+pub const VIEWPORT_INFO_HEIGHT = BLOCK * 4;
 
 pub const FPS = 60;
 pub const TICKS_PER_FRAME: f64 = 1000.0 / @intToFloat(f64, FPS);
@@ -44,14 +44,21 @@ pub const LevelViewport: c.SDL_Rect = .{
 
 pub const ScoreViewport: c.SDL_Rect = .{
     .x = BLOCK * 12,
-    .y = BLOCK * 8,
+    .y = BLOCK * 6,
+    .w = VIEWPORT_INFO_WIDTH,
+    .h = VIEWPORT_INFO_HEIGHT,
+};
+
+pub const LineViewport: c.SDL_Rect = .{
+    .x = BLOCK * 12,
+    .y = BLOCK * 11,
     .w = VIEWPORT_INFO_WIDTH,
     .h = VIEWPORT_INFO_HEIGHT,
 };
 
 pub const TetrominoViewport: c.SDL_Rect = .{
     .x = BLOCK * 12,
-    .y = BLOCK * 15,
+    .y = BLOCK * 16,
     .w = VIEWPORT_INFO_WIDTH,
-    .h = VIEWPORT_INFO_HEIGHT,
+    .h = BLOCK * 5,
 };

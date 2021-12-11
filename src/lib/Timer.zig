@@ -1,6 +1,6 @@
 const std = @import("std");
 const err = std.log.err;
-const c = @import("sdl.zig");
+const c = @import("../sdl.zig");
 
 const Self = @This();
 

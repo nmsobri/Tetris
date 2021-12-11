@@ -1,15 +1,15 @@
 const std = @import("std");
 const err = std.log.err;
-const c = @import("sdl.zig");
+const c = @import("../sdl.zig");
 
-const Timer = @import("Timer.zig");
-const Board = @import("Board.zig");
-const Piece = @import("Piece.zig");
-const BitmapFont = @import("BitmapFont.zig");
-const Font = @import("Font.zig");
-const constant = @import("constant.zig");
-const StateInterface = @import("interface.zig").StateInterface;
-const StateMachine = @import("StateMachine.zig");
+const Timer = @import("../lib/Timer.zig");
+const Board = @import("../Board.zig");
+const Piece = @import("../Piece.zig");
+const BitmapFont = @import("../lib/BitmapFont.zig");
+const Font = @import("../lib/Font.zig");
+const constant = @import("../constant.zig");
+const StateInterface = @import("../interface.zig").StateInterface;
+const StateMachine = @import("../lib/StateMachine.zig");
 const PlayState = @import("PlayState.zig");
 
 const Entity = enum { Board, Piece };
@@ -110,7 +110,7 @@ fn renderFn(child: *StateInterface) !void {
     txt_width = self.font_credit.calculateTextWidth("(C) Sobri 2021");
     try self.font_credit.renderText(@intCast(c_int, ((constant.BLOCK * 10) - txt_width) / 2), constant.SCREEN_HEIGHT - 110, "(C) Sobri 2021", 0, 0, 0);
 
-    // // Right viewport
+    // Right viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &constant.RightViewport);
     _ = c.SDL_SetRenderDrawColor(self.renderer, 0x00, 0x00, 0x00, 0xFF);
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
@@ -121,11 +121,11 @@ fn renderFn(child: *StateInterface) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     txt_width = self.font_info.calculateTextWidth("Level");
-    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 55, "Level", 255, 0, 0);
+    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 35, "Level", 255, 0, 0);
 
     var level_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{1});
     txt_width = self.font_info.calculateTextWidth(level_txt);
-    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 95, level_txt, 255, 0, 0);
+    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 75, level_txt, 255, 0, 0);
 
     // Score viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &constant.ScoreViewport);
@@ -133,11 +133,23 @@ fn renderFn(child: *StateInterface) !void {
     _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
 
     txt_width = self.font_info.calculateTextWidth("Score");
-    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 55, "Score", 255, 0, 0);
+    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 35, "Score", 255, 0, 0);
 
     var score_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{0});
     txt_width = self.font_info.calculateTextWidth(score_txt);
-    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 95, score_txt, 255, 0, 0);
+    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 75, score_txt, 255, 0, 0);
+
+    // Line viewport
+    _ = c.SDL_RenderSetViewport(self.renderer, &constant.LineViewport);
+    _ = c.SDL_SetRenderDrawColor(self.renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+    _ = c.SDL_RenderFillRect(self.renderer, &.{ .x = 0, .y = 0, .w = constant.BLOCK * 6, .h = constant.SCREEN_HEIGHT });
+
+    txt_width = self.font_info.calculateTextWidth("Line");
+    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 35, "Line", 255, 0, 0);
+
+    var line_txt = try std.fmt.allocPrintZ(self.allocator, "{d}", .{0});
+    txt_width = self.font_info.calculateTextWidth(line_txt);
+    try self.font_info.renderText(@intCast(c_int, (constant.VIEWPORT_INFO_WIDTH - txt_width) / 2), 75, line_txt, 255, 0, 0);
 
     // Tetromino viewport
     _ = c.SDL_RenderSetViewport(self.renderer, &constant.TetrominoViewport);

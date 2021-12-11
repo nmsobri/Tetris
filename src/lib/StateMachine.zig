@@ -1,5 +1,5 @@
 const std = @import("std");
-const StateInterfce = @import("interface.zig").StateInterface;
+const StateInterfce = @import("../interface.zig").StateInterface;
 
 const Self = @This();
 
