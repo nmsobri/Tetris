@@ -19,4 +19,4 @@ cd Tetris
 zig build play  
 ```
 
-<img src="https://i.imgur.com/42sautx.png" width="70%" height="70%">
+<img src="https://i.imgur.com/42sautx.png" width="80%" height="80%">
