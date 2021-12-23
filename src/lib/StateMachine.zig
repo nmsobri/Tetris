@@ -5,7 +5,7 @@ const Self = @This();
 
 states: std.ArrayList(*StateInterfce),
 
-pub fn init(allocator: *std.mem.Allocator) Self {
+pub fn init(allocator: std.mem.Allocator) Self {
     return Self{
         .states = std.ArrayList(*StateInterfce).init(allocator),
     };

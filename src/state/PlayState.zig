@@ -14,7 +14,7 @@ const PauseState = @import("PauseState.zig");
 const GameOverState = @import("GameOverState.zig");
 
 const Entity = enum { Board, Piece };
-const Element = struct { typ: Entity, obj: *const c_void };
+const Element = struct { typ: Entity, obj: *const anyopaque };
 const Self = @This();
 
 level: u8 = 1,
@@ -24,7 +24,7 @@ cap_timer: Timer = undefined,
 window: *c.SDL_Window = null,
 elements: [2]Element = undefined,
 renderer: *c.SDL_Renderer = null,
-allocator: *std.mem.Allocator = undefined,
+allocator: std.mem.Allocator = undefined,
 font_info: BitmapFont = undefined,
 interface: StateInterfce = undefined,
 state_machine: *Statemachine = undefined,
@@ -32,7 +32,7 @@ drop_sound: *c.Mix_Chunk = undefined,
 clear_sound: *c.Mix_Chunk = undefined,
 bg_music: *c.Mix_Music = undefined,
 
-pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *Statemachine) !*Self {
+pub fn init(allocator: std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *Statemachine) !*Self {
     var self = try allocator.create(Self);
 
     self.* = Self{

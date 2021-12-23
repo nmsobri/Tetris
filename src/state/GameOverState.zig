@@ -13,19 +13,19 @@ const StateMachine = @import("../lib/StateMachine.zig");
 const PlayState = @import("PlayState.zig");
 
 const Entity = enum { Board, Piece };
-const Element = struct { typ: Entity, obj: *const c_void };
+const Element = struct { typ: Entity, obj: *const anyopaque };
 const Self = @This();
 
 window: *c.SDL_Window = null,
 renderer: *c.SDL_Renderer = null,
-allocator: *std.mem.Allocator = undefined,
+allocator: std.mem.Allocator = undefined,
 interface: StateInterface = undefined,
 state_machine: *StateMachine = undefined,
 play_state: *PlayState = undefined,
 font_info: BitmapFont = undefined,
 extra_info_font: BitmapFont = undefined,
 
-pub fn init(allocator: *std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *StateMachine) !*Self {
+pub fn init(allocator: std.mem.Allocator, window: *c.SDL_Window, renderer: *c.SDL_Renderer, state_machine: *StateMachine) !*Self {
     var self = try allocator.create(Self);
 
     self.* = Self{

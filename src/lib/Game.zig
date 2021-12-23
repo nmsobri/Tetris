@@ -11,10 +11,10 @@ const Self = @This();
 fps_timer: Timer = undefined,
 window: ?*c.SDL_Window = null,
 renderer: ?*c.SDL_Renderer = null,
-allocator: *std.mem.Allocator = undefined,
+allocator: std.mem.Allocator = undefined,
 state_machine: *StateMachine = undefined,
 
-pub fn init(allocator: *std.mem.Allocator) !Self {
+pub fn init(allocator: std.mem.Allocator) !Self {
     if (c.SDL_Init(c.SDL_INIT_VIDEO | c.SDL_INIT_AUDIO) < 0) {
         err("Couldn't initialize SDL: {s}", .{c.SDL_GetError()});
         return error.ERROR_INIT_SDL;

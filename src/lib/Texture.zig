@@ -6,7 +6,7 @@ const Self = @This();
 width: u32 = undefined,
 height: u32 = undefined,
 texture: ?*c.SDL_Texture = undefined,
-pixels: ?*c_void,
+pixels: ?*anyopaque,
 pitch: c_int,
 window: *c.SDL_Window = undefined,
 renderer: *c.SDL_Renderer = undefined,
@@ -163,7 +163,7 @@ pub fn getHeight(self: Self) u32 {
     return self.height;
 }
 
-pub fn getPixels(self: Self) *c_void {
+pub fn getPixels(self: Self) *anyopaque {
     return self.pixels.?;
 }
 
@@ -227,7 +227,7 @@ pub fn setAsRenderTarget(self: Self) !void {
     }
 }
 
-pub fn copyPixels(self: Self, pixels: *c_void) !void {
+pub fn copyPixels(self: Self, pixels: *anyopaque) !void {
     if (self.pixels != null) {
         @memcpy(
             @ptrCast([*]u8, @alignCast(@alignOf(u8), self.pixels)),

@@ -5,7 +5,7 @@ const c = @import("../sdl.zig");
 const Self = @This();
 
 pitch: c_int = undefined,
-pixels: ?*c_void = undefined,
+pixels: ?*anyopaque = undefined,
 width: u32 = undefined,
 height: u32 = undefined,
 texture: ?*c.SDL_Texture = undefined,
@@ -148,7 +148,7 @@ pub fn getTexture(self: Self) *c.SDL_Texture {
     return self.texture.?;
 }
 
-pub fn getPixels(self: Self) *c_void {
+pub fn getPixels(self: Self) *anyopaque {
     return self.pixels.?;
 }
 
@@ -205,7 +205,7 @@ pub fn createBlankTexture(
     self.height = @intCast(u32, height);
 }
 
-pub fn copyPixels(self: Self, pixels: *c_void) !void {
+pub fn copyPixels(self: Self, pixels: *anyopaque) !void {
     if (self.pixels.? != null) {
         @memcpy(
             @ptrCast([*]u8, @alignCast(@alignOf(u8), self.pixels.?)),
